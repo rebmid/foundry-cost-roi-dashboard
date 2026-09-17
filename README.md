@@ -48,17 +48,20 @@ Cost Management ──(FOCUS export)──► Storage (real billed $, optional) 
 
 ## Quick start
 
-1. **Turn on the plumbing** — see [`enablement/enable-plumbing.md`](enablement/enable-plumbing.md)
+1. **Turn on the plumbing:** see [`enablement/enable-plumbing.md`](enablement/enable-plumbing.md)
    (diagnostic settings, APIM token metrics, optional FOCUS export).
-2. **Edit the rate card** — [`rate-card/rates.csv`](rate-card/rates.csv) with your prices.
-   The same numbers are inlined in each query's `rates` datatable; update both.
+2. **Set your prices:** this workbook holds the rate card as an inline `rates` datatable at
+   the top of each query (that is what actually runs). [`rate-card/rates.csv`](rate-card/rates.csv)
+   is only a human-readable copy, so edit the datatable values. If you would rather not edit
+   queries, use the Log Analytics workbook below, which exposes the rate card as an **editable
+   parameter** you change in the portal.
 3. **Import the workbook**:
    - Azure portal -> **Monitor -> Workbooks -> New**.
    - Click **</> Advanced Editor**, choose **Gallery Template**, paste the contents of
      [`workbook/FoundryCostRoi.workbook`](workbook/FoundryCostRoi.workbook), click **Apply**.
    - **Save**, scope it to your AI subscriptions, and pin it to a shared dashboard.
    - Set the **Application Insights** parameter to the component your APIM gateway logs to.
-4. **Set your ROI inputs** — open the ROI tile and edit `hoursSaved` and `loadedRate`
+4. **Set your ROI inputs:** open the ROI tile and edit `hoursSaved` and `loadedRate`
    at the top of the query (or wire them to workbook parameters).
 
 ## Two workbook variants (pick by telemetry source)
@@ -87,7 +90,8 @@ Or import it via **Monitor > Workbooks > New > Advanced Editor** (replace the
 
 - **Rates:** the `rates` datatable maps a model *family* to input/output USD per 1K
   tokens. Deployment names are mapped to a family with a `case()` expression; extend it
-  for your deployments.
+  for your deployments. (This is the `FoundryCostRoi.workbook` mechanism; the Log Analytics
+  workbook uses an editable `Rate card` parameter instead, no datatable editing.)
 - **Billed vs. estimate:** to show invoice-accurate cost, replace the rate-card math in
   the daily-spend and by-model queries with a query over your FOCUS export (cost is
   already in dollars there).
@@ -132,7 +136,7 @@ this a governance dashboard rather than a billing chart.
 | Purview DLP | sensitive-data hits, blocked / flagged requests | App Insights / APIM gateway logs | `ModelDeploymentName`, `Team`, `ApiId` |
 | Foundry evals + tracing | groundedness / relevance / safety scores, agent traces, escalations | App Insights `traces` / `customEvents` | operation id, deployment |
 
-### Microsoft Purview — DLP at the AI gateway
+### Microsoft Purview: DLP at the AI gateway
 - **What:** enforce data-loss-prevention on prompts and responses at the *same* APIM
   gateway that emits your token metrics, so one control plane gives you cost **and** data
   protection.
@@ -234,4 +238,4 @@ Two caveats worth knowing:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
