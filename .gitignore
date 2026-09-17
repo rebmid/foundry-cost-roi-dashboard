@@ -1,0 +1,10 @@
+# Local / editor
+.vs/
+.vscode/
+*.user
+Thumbs.db
+.DS_Store
+
+# Secrets / local config - never commit real prices or endpoints if sensitive
+*.local.*
+.env

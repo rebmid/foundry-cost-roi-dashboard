@@ -1,0 +1,13 @@
+// 05 - Token volume by type (input / output / cached), daily stacked
+// Pivots the emitted token metrics into one column per token type.
+
+customMetrics
+| where name in ("Prompt Tokens", "Completion Tokens", "Cached Tokens")
+| extend TokenType = case(
+    name == "Prompt Tokens",     "Input",
+    name == "Completion Tokens", "Output",
+    "Cached")
+| summarize Tokens = sum(valueSum) by TokenType, bin(timestamp, 1d)
+| evaluate pivot(TokenType, sum(Tokens))
+| order by timestamp asc
+| render columnchart kind=stacked

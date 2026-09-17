@@ -1,0 +1,119 @@
+{
+  "id": null,
+  "uid": "foundry-cost-roi",
+  "title": "AI Cost & ROI - Azure AI Foundry",
+  "description": "Azure AI Foundry / Azure OpenAI token telemetry turned into cost and ROI. Token counts from Azure Monitor + a rate card = dollars. Set the data source and the App Insights resource ID variables.",
+  "tags": ["finops", "azure-openai", "foundry", "ai-cost"],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "refresh": "1h",
+  "time": { "from": "now-30d", "to": "now" },
+  "timezone": "",
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Azure Monitor data source",
+        "type": "datasource",
+        "query": "grafana-azure-monitor-datasource",
+        "hide": 0,
+        "current": {},
+        "refresh": 1
+      },
+      {
+        "name": "resource",
+        "label": "App Insights resource ID",
+        "description": "Full resource ID of the Application Insights component your APIM gateway emits token metrics to.",
+        "type": "textbox",
+        "query": "",
+        "hide": 0,
+        "current": { "text": "", "value": "" }
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Month-to-date cost",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family,bin(timestamp,1d) | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); base | where timestamp>=startofmonth(now()) | summarize Value=round(sum(costUsd),0)" } } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "dark-blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Value$/", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Forecast (end of month)",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family,bin(timestamp,1d) | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); let mtd=toscalar(base | where timestamp>=startofmonth(now()) | summarize sum(costUsd)); print Value=round(mtd/toreal(datetime_part(\"day\",now()))*toreal(datetime_part(\"day\",endofmonth(now()))),0)" } } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Value$/", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Cost per 1K tokens",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family,bin(timestamp,1d) | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); base | summarize c=sum(costUsd),t=sum(inTok+outTok) | project Value=round(c/(t/1000.0),4)" } } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "decimals": 4, "color": { "mode": "fixed", "fixedColor": "dark-blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Value$/", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "stat",
+      "title": "Prompt cache hit rate",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "customMetrics | where name in (\"Prompt Tokens\",\"Cached Tokens\") | summarize p=sumif(valueSum,name==\"Prompt Tokens\"),c=sumif(valueSum,name==\"Cached Tokens\") | project Value=round(100.0*c/p,1)" } } ],
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Value$/", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "timeseries",
+      "title": "Daily AI spend (USD)",
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "time_series", "query": "let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family,bin(timestamp,1d) | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); base | make-series DailyCostUsd=sum(costUsd) default=0 on timestamp from startofday(ago(30d)) to startofday(now()) step 1d | mv-expand timestamp to typeof(datetime), DailyCostUsd to typeof(real) | project timestamp, DailyCostUsd=round(DailyCostUsd,2)" } } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "pointSize": 5 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } }
+    },
+    {
+      "type": "barchart",
+      "title": "Spend by model (MTD)",
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 4 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | where timestamp>=startofmonth(now()) | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family | lookup kind=leftouter rates on family | extend CostUsd=round((inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)),2) | project family, CostUsd | order by CostUsd desc" } } ],
+      "fieldConfig": { "defaults": { "unit": "currencyUSD" }, "overrides": [] },
+      "options": { "orientation": "horizontal", "xField": "family", "showValue": "auto", "stacking": "none", "legend": { "showLegend": false } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Token volume by type (Input / Output / Cached)",
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 13 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "time_series", "query": "customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\",\"Cached Tokens\") | extend TokenType=case(name==\"Prompt Tokens\",\"Input\",name==\"Completion Tokens\",\"Output\",\"Cached\") | summarize Tokens=sum(valueSum) by TokenType, bin(timestamp,1d) | evaluate pivot(TokenType, sum(Tokens))" } } ],
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 80, "lineWidth": 1, "stacking": { "mode": "normal", "group": "A" } } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi" } }
+    },
+    {
+      "type": "stat",
+      "title": "Net ROI (this period)",
+      "gridPos": { "h": 4, "w": 10, "x": 14, "y": 13 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let hoursSaved=1240.0; let loadedRate=74.0; let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | where timestamp>=startofmonth(now()) | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); let agentCost=toscalar(base | summarize sum(costUsd)); print Value=round(100.0*(hoursSaved*loadedRate-agentCost)/max_of(agentCost,1.0),0)" } } ],
+      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^Value$/", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" }
+    },
+    {
+      "type": "table",
+      "title": "Business value / ROI (edit hoursSaved and loadedRate in the query)",
+      "gridPos": { "h": 5, "w": 10, "x": 14, "y": 17 },
+      "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" },
+      "targets": [ { "refId": "A", "queryType": "Azure Log Analytics", "datasource": { "type": "grafana-azure-monitor-datasource", "uid": "${datasource}" }, "azureLogAnalytics": { "resources": ["${resource}"], "resultFormat": "table", "query": "let hoursSaved=1240.0; let loadedRate=74.0; let rates=datatable(family:string,inK:real,outK:real)[\"gpt-5.x\",0.00125,0.010,\"gpt-4o\",0.0025,0.010,\"gpt-4o-mini\",0.00015,0.0006,\"o-series\",0.0011,0.0044]; let base=customMetrics | where name in (\"Prompt Tokens\",\"Completion Tokens\") | where timestamp>=startofmonth(now()) | extend dep=tostring(customDimensions.ModelDeploymentName) | extend family=case(dep has \"gpt-4o-mini\",\"gpt-4o-mini\",dep has \"gpt-4o\",\"gpt-4o\",dep has \"gpt-5\",\"gpt-5.x\",dep has_any(\"o1\",\"o3\",\"o4\"),\"o-series\",\"gpt-4o\") | summarize inTok=sumif(valueSum,name==\"Prompt Tokens\"),outTok=sumif(valueSum,name==\"Completion Tokens\") by family | lookup kind=leftouter rates on family | extend costUsd=(inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0)); let valueOfTime=hoursSaved*loadedRate; let agentCost=toscalar(base | summarize sum(costUsd)); print ord=1,Metric=\"Hours saved / period\",Value=tostring(hoursSaved) | union (print ord=2,Metric=\"Value of time saved\",Value=strcat(\"$\",tostring(round(valueOfTime,0)))) | union (print ord=3,Metric=\"Agent run cost\",Value=strcat(\"$\",tostring(round(agentCost,0)))) | union (print ord=4,Metric=\"Payback (share of period)\",Value=iff(valueOfTime<=0,\"n/a\",tostring(round(agentCost/valueOfTime,2)))) | order by ord asc | project Metric, Value" } } ],
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": { "showHeader": true }
+    }
+  ]
+}

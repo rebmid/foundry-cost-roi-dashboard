@@ -1,0 +1,36 @@
+// 03 - Headline KPI strip: month-to-date cost, forecast, cost per 1K tokens, cache hit rate
+// Returns 4 rows (Metric, Value). Render as "tiles" in a workbook.
+
+let rates = datatable(family:string, inK:real, outK:real) [
+    "gpt-5.x",     0.00125, 0.010,
+    "gpt-4o",      0.0025,  0.010,
+    "gpt-4o-mini", 0.00015, 0.0006,
+    "o-series",    0.0011,  0.0044
+];
+let base = customMetrics
+    | where name in ("Prompt Tokens", "Completion Tokens", "Cached Tokens")
+    | extend dep = tostring(customDimensions.ModelDeploymentName)
+    | extend family = case(
+        dep has "gpt-4o-mini", "gpt-4o-mini",
+        dep has "gpt-4o",      "gpt-4o",
+        dep has "gpt-5",       "gpt-5.x",
+        dep has_any ("o1", "o3", "o4"), "o-series",
+        "gpt-4o")
+    | summarize inTok = sumif(valueSum, name == "Prompt Tokens"),
+                outTok = sumif(valueSum, name == "Completion Tokens")
+             by family, bin(timestamp, 1d)
+    | lookup kind=leftouter rates on family
+    | extend costUsd = (inTok / 1000.0 * coalesce(inK, 0.0)) + (outTok / 1000.0 * coalesce(outK, 0.0));
+let mtd = toscalar(base | where timestamp >= startofmonth(now()) | summarize sum(costUsd));
+let tot = toscalar(base | summarize sum(costUsd));
+let tok = toscalar(base | summarize sum(inTok + outTok));
+let promptTok = toscalar(customMetrics | where name == "Prompt Tokens" | summarize sum(valueSum));
+let cacheTok  = toscalar(customMetrics | where name == "Cached Tokens" | summarize sum(valueSum));
+let dNow = toreal(datetime_part("day", now()));
+let dEnd = toreal(datetime_part("day", endofmonth(now())));
+print ord = 1, Metric = "Month-to-date cost", Value = strcat("$", tostring(round(mtd, 0)))
+| union (print ord = 2, Metric = "Forecast (end of month)", Value = strcat("$", tostring(round(mtd / dNow * dEnd, 0))))
+| union (print ord = 3, Metric = "Cost per 1K tokens", Value = strcat("$", tostring(round(tot / (tok / 1000.0), 4))))
+| union (print ord = 4, Metric = "Prompt cache hit rate", Value = iff(isnull(promptTok) or promptTok == 0, "n/a", strcat(tostring(round(100.0 * cacheTok / promptTok, 1)), "%")))
+| order by ord asc
+| project Metric, Value

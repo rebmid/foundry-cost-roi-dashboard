@@ -1,0 +1,18 @@
+// 04 - Prompt cache hit rate
+// Two options. Use whichever your telemetry supports.
+
+// Option A (native metric, no rate card): Azure OpenAI / Foundry platform metric
+// "Prompt Token Cache Match Rate", routed to Log Analytics via diagnostic settings.
+// Query the AOAI resource's AzureMetrics table.
+AzureMetrics
+| where MetricName == "AzureOpenAIPromptTokenCacheMatchRate"    // portal name: "Prompt Token Cache Match Rate"
+| summarize CacheHitRatePct = round(avg(Average), 1)
+| project Metric = "Prompt cache hit rate", Value = strcat(tostring(CacheHitRatePct), "%")
+
+// Option B (from emitted tokens, if your APIM policy emits a "Cached Tokens" metric):
+// customMetrics
+// | where name in ("Prompt Tokens", "Cached Tokens")
+// | summarize prompt = sumif(valueSum, name == "Prompt Tokens"),
+//             cached = sumif(valueSum, name == "Cached Tokens")
+// | extend CacheHitRatePct = round(100.0 * cached / prompt, 1)
+// | project Metric = "Prompt cache hit rate", Value = strcat(tostring(CacheHitRatePct), "%")

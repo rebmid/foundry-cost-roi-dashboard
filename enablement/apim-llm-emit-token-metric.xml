@@ -1,0 +1,34 @@
+<!--
+  APIM AI gateway: emit token metrics with a Team/app dimension to Application Insights.
+  Place this in the API-level policy for your Azure OpenAI / Foundry-backed API.
+  Prereq: an Application Insights logger attached to the APIM instance.
+
+  Policy reference: llm-emit-token-metric (generic LLM) or the Azure OpenAI alias
+  azure-openai-emit-token-metric. It emits Prompt Tokens, Completion Tokens and
+  Total Tokens as custom metrics; the <dimension> elements become customDimensions
+  you can group by (ModelDeploymentName, Team, ApiId).
+-->
+<policies>
+  <inbound>
+    <base />
+    <!-- Derive a chargeback dimension. Adjust to your reality:
+         a request header, the APIM subscription name, or a product/app id. -->
+    <set-variable name="team" value="@(context.Request.Headers.GetValueOrDefault("x-team", context.Subscription?.Name ?? "unassigned"))" />
+
+    <!-- Emit one metric per request with token counts split by these dimensions. -->
+    <llm-emit-token-metric namespace="ai-gateway">
+      <dimension name="ModelDeploymentName" value="@(context.Request.MatchedParameters.GetValueOrDefault("deployment-id", context.Api.Name))" />
+      <dimension name="Team" value="@((string)context.Variables["team"])" />
+      <dimension name="ApiId" value="@(context.Api.Id)" />
+    </llm-emit-token-metric>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

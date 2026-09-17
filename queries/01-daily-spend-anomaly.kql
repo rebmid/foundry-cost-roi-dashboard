@@ -1,0 +1,33 @@
+// 01 - Daily AI spend + anomaly detection
+// Source: Application Insights customMetrics (APIM llm-emit-token-metric) x rate card.
+// Swap the rate-card math for a FOCUS-export query if you want billed (invoice) dollars.
+// Anomaly points are flagged with series_decompose_anomalies (fires the "spike" marker).
+
+let rates = datatable(family:string, inK:real, outK:real) [
+    "gpt-5.x",     0.00125, 0.010,
+    "gpt-4o",      0.0025,  0.010,
+    "gpt-4o-mini", 0.00015, 0.0006,
+    "o-series",    0.0011,  0.0044
+];
+let base = customMetrics
+    | where name in ("Prompt Tokens", "Completion Tokens", "Cached Tokens")
+    | extend dep = tostring(customDimensions.ModelDeploymentName),
+             team = tostring(customDimensions.Team)
+    | extend family = case(
+        dep has "gpt-4o-mini", "gpt-4o-mini",
+        dep has "gpt-4o",      "gpt-4o",
+        dep has "gpt-5",       "gpt-5.x",
+        dep has_any ("o1", "o3", "o4"), "o-series",
+        "gpt-4o")
+    | summarize inTok = sumif(valueSum, name == "Prompt Tokens"),
+                outTok = sumif(valueSum, name == "Completion Tokens")
+             by family, team, bin(timestamp, 1d)
+    | lookup kind=leftouter rates on family
+    | extend costUsd = (inTok / 1000.0 * coalesce(inK, 0.0)) + (outTok / 1000.0 * coalesce(outK, 0.0));
+base
+| make-series DailyCostUsd = sum(costUsd) default = 0
+    on timestamp from startofday(ago(30d)) to startofday(now()) step 1d
+| extend (flag, score, baseline) = series_decompose_anomalies(DailyCostUsd, 1.5)
+| mv-expand timestamp to typeof(datetime), DailyCostUsd to typeof(real), flag to typeof(long)
+| project timestamp, DailyCostUsd = round(DailyCostUsd, 2), Anomaly = iff(flag != 0, round(DailyCostUsd, 2), real(null))
+| render timechart
