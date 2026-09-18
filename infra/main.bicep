@@ -286,18 +286,6 @@ resource alertsWorkbook 'Microsoft.Insights/workbooks@2022-04-01' = {
   }
 }
 
-resource azureOpenAIInsightsWorkbook 'Microsoft.Insights/workbooks@2022-04-01' = {
-  name: guid(resourceGroup().id, resourceSuffix, 'azureOpenAIInsights')
-  location: resourceGroup().location
-  kind: 'shared'
-  properties: {
-    displayName: 'Azure OpenAI Insights'
-    serializedData: string(loadJsonContent('workbooks/azure-openai-insights.json'))
-    sourceId: logAnalytics.id
-    category: 'workbook'
-  }
-}
-
 resource openAIUsageWorkbook 'Microsoft.Insights/workbooks@2022-04-01' = {
   name: guid(resourceGroup().id, resourceSuffix, 'costAnalysis')
   location: resourceGroup().location
@@ -807,7 +795,6 @@ module finOpsDashboardModule 'dashboard.bicep' = {
       workspaceName: logAnalytics.name
       workspaceId: logAnalytics.id
       workbookCostAnalysisId: openAIUsageWorkbook.id
-      workbookAzureOpenAIInsightsId: azureOpenAIInsightsWorkbook.id
       appInsightsId: applicationInsights.id
       appInsightsName: applicationInsights.name
     }

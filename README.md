@@ -80,7 +80,7 @@ workspace-side pieces (tables, DCRs, and the cost + ROI workbooks).
 | Foundry + model deployments | gpt-4.1, gpt-4.1-mini, DeepSeek-V3.2 (edit in `params.json`) |
 | `PRICING_CL` + `SUBSCRIPTION_QUOTA_CL` (+ DCRs) | Rate card and per-team budgets |
 | Cost Analysis + Foundry Cost & ROI workbooks | Cost/chargeback and ROI views |
-| Azure OpenAI Insights + Alerts workbooks + dashboard | Operational monitoring |
+| Alerts workbook + dashboard | Operational monitoring |
 | Logic App + scheduled-query rules | **Auto-disables** any team that exceeds its cost quota, and re-enables it when spend drops back under |
 
 The infra is adapted from the MIT-licensed Azure-Samples/AI-Gateway project; see [`NOTICE`](NOTICE)

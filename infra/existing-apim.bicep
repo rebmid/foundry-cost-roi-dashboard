@@ -11,7 +11,7 @@
 @description('Name of your existing Log Analytics workspace. Deploy this template into that workspace\'s resource group.')
 param logAnalyticsWorkspaceName string
 
-@description('Also deploy the Alerts and Azure OpenAI Insights workbooks.')
+@description('Also deploy the Alerts workbook.')
 param deployStockWorkbooks bool = false
 
 param location string = resourceGroup().location
@@ -171,18 +171,6 @@ resource alertsWorkbook 'Microsoft.Insights/workbooks@2022-04-01' = if (deploySt
   properties: {
     displayName: 'Alerts Workbook'
     serializedData: loadTextContent('workbooks/alerts.json')
-    sourceId: logAnalytics.id
-    category: 'workbook'
-  }
-}
-
-resource azureOpenAIInsightsWorkbook 'Microsoft.Insights/workbooks@2022-04-01' = if (deployStockWorkbooks) {
-  name: guid(resourceGroup().id, resourceSuffix, 'azureOpenAIInsights')
-  location: location
-  kind: 'shared'
-  properties: {
-    displayName: 'Azure OpenAI Insights'
-    serializedData: string(loadJsonContent('workbooks/azure-openai-insights.json'))
     sourceId: logAnalytics.id
     category: 'workbook'
   }

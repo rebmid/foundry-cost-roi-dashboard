@@ -2,7 +2,7 @@ param resourceSuffix string
 param workspaceName string
 param workspaceId string
 param workbookCostAnalysisId string
-param workbookAzureOpenAIInsightsId string
+param workbookAzureOpenAIInsightsId string = ''
 param appInsightsId string
 param appInsightsName string
 
