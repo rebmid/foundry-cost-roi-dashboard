@@ -18,20 +18,20 @@ Use it two ways:
 
 *The Log Analytics cost and chargeback workbook ([`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook)).*
 
-Two pickers scope everything: **Time range** and **Subscription** (the APIM subscription =
-team). The KPI strip shows **total cost, total tokens, calls, and cost per 1K tokens** for the
-selected scope. The **Live token volume** tile reads platform metrics (about 1 minute) for
-near-real-time input / output / total tokens, faster than the log-based tiles. Below (not in
-this view) are spend by model, spend by subscription, spend over time, anomaly detection,
+Two pickers scope everything: **Time range** and **Subscription** (the APIM subscription = team).
+The top **KPI strip** shows total cost, total tokens, calls, and cost per 1K tokens for the selected
+range. The **Month to date** section is a fixed calendar-month view: spend so far, a run-rate
+projected month-end, average per day, and a per-day + cumulative **burn-up**. Further down (next
+images) are live token volume, spend by model and by team, spend over time, anomaly detection,
 budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-consumers table.
 
-![Spend by model, by subscription, and over time](docs/dashboard-breakdown.png)
+![Live token volume and spend by model and team](docs/dashboard-breakdown.png)
 
-*Breakdown tiles: spend by model, spend by subscription (chargeback), and spend over time.*
+*Live token volume from platform metrics (about 1 minute), and where the money goes: spend by model and by subscription (chargeback).*
 
-![Spend anomaly detection and budget vs actual](docs/dashboard-anomaly-budget.png)
+![Spend over time, anomaly detection, and budget vs actual](docs/dashboard-anomaly-budget.png)
 
-*Spend anomaly detection (actual vs expected) and budget vs actual per subscription, with an OVER BUDGET / Warning / OK status.*
+*Spend over time by model, spend anomaly detection (actual vs expected), and budget vs actual per team with an OVER BUDGET / Warning / OK status.*
 
 ### Foundry Cost & ROI workbook
 
