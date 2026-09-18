@@ -1,0 +1,41 @@
+// 07 - Reconcile estimated token cost vs actual Azure billed cost (FOCUS)
+//
+// This dashboard shows an ESTIMATE (tokens x rate card at Azure list price). This query
+// compares that estimate against the ACTUAL billed cost from a FOCUS 1.0 cost export and
+// derives a per-day calibration factor (billed / estimated). Apply yesterday's factor to
+// today's live estimate so the estimate tracks the invoice, without editing any prices.
+//
+// FOCUS source: Cost Management > Exports > create a FOCUS 1.0 export to a storage account,
+// or use the FinOps hub. Then either point externaldata() at the exported blob(s) below, or
+// replace the `billed` block with a query over your FinOps hub `Costs` table.
+//
+// Note: FOCUS/billed data lags ~24h, so reconciliation is a next-day calibration, not real time.
+
+// ---- 1. Estimated cost from tokens x PRICING_CL (per day) ----
+let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;
+let estimated =
+    ApiManagementGatewayLlmLog
+    | where DeploymentName != ''
+    | join kind=leftouter rateCard on $left.DeploymentName == $right.Model
+    | extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)
+    | extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0
+    | summarize EstimatedCost = sum(Cost) by Day = startofday(TimeGenerated);
+// ---- 2. Actual billed cost from the FOCUS export (AI services only) ----
+// FOCUS 1.0 columns: BilledCost, EffectiveCost, ServiceName, ServiceCategory, ChargePeriodStart.
+// Replace the URL with your FOCUS export blob(s); h@ uses the file's SAS token.
+let billed =
+    externaldata(BilledCost:real, EffectiveCost:real, ServiceName:string, ServiceCategory:string, ChargePeriodStart:datetime)
+    [ h@'https://<account>.blob.core.windows.net/<container>/<focus-export>.csv' ]
+    with (format='csv', ignoreFirstRecord=true)
+    | where ServiceCategory == 'AI and Machine Learning' or ServiceName has_any ('OpenAI', 'Azure AI', 'Cognitive')
+    | summarize BilledCost = sum(EffectiveCost) by Day = startofday(ChargePeriodStart);
+// ---- 3. Reconcile: estimate vs billed, variance, and calibration factor ----
+estimated
+| join kind=fullouter billed on Day
+| extend Day = coalesce(Day, Day1)
+| extend EstimatedCost = round(coalesce(EstimatedCost, 0.0), 4),
+         BilledCost = round(coalesce(BilledCost, 0.0), 4)
+| extend Variance = round(BilledCost - EstimatedCost, 4)
+| extend CalibrationFactor = round(BilledCost / iff(EstimatedCost > 0, EstimatedCost, real(null)), 3)
+| project Day, EstimatedCost, BilledCost, Variance, CalibrationFactor
+| order by Day asc

@@ -127,7 +127,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Business value / ROI\nValue of time saved (hours x loaded rate) vs month-to-date agent token cost. Edit the two inputs in the pills above."
+                                      "json":  "## Business value / ROI\nValue of time saved (hours x loaded rate) vs month-to-date agent token cost. The **Hours saved / month** and **Loaded rate** defaults are examples: set them to your own figures in the pills above, so the ROI is illustrative until real inputs are entered."
                                   },
                       "name":  "h-roi"
                   },

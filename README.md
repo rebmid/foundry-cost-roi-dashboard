@@ -12,6 +12,28 @@ Use it two ways:
   accelerator required.
 - **Drop the workbooks** into an APIM + Log Analytics gateway you already run.
 
+## Scope and how it fits
+
+This is the **AI operational economics layer**: near-real-time tokens, estimated cost, model/team
+breakdown, anomalies, quotas, and ROI. It is not a complete financial system, position it alongside
+your billing system, not instead of it.
+
+- **What it covers:** Foundry / Azure OpenAI traffic **routed through the APIM gateway**. Team
+  attribution comes from the APIM subscription, so it only sees traffic that carries an APIM key.
+- **What it does not cover:** Foundry or Azure OpenAI traffic that **bypasses APIM**, Azure OpenAI
+  resources without the token-logging policy, and Copilot products billed separately (**Microsoft
+  365 Copilot, GitHub Copilot, Copilot Studio**). Route those through the gateway, or track them in
+  Cost Management / your FinOps platform.
+- **Estimate, not invoice.** Cost here is tokens x rate card at Azure **list** price. For billed and
+  amortized truth, use Cost Management / a **FOCUS** export and reconcile the two with
+  [`queries/07-focus-reconciliation.kql`](queries/07-focus-reconciliation.kql): it derives a per-day
+  **calibration factor** (billed / estimated) you apply to the live estimate so it tracks the
+  invoice (billed data lags ~24h, so this is next-day calibration).
+
+The strongest architecture is three layers: **this dashboard** (live tokens, estimated cost,
+chargeback, anomalies, quotas, ROI) + **Cost Management / FOCUS** (billed and amortized truth) + a
+**reconciliation view** between them.
+
 ## What it looks like
 
 ![Foundry cost and chargeback workbook](docs/dashboard.png)
@@ -172,6 +194,13 @@ token split, and a top-consumers table. The **Foundry Cost & ROI** workbook adds
 (hours saved x loaded rate vs token cost); see [ROI model](docs/roi-model.md) for what the two
 inputs mean and how to set them. Costs are Azure list price.
 
+The two **Log Analytics** workbooks are the recommended ones: they read the **`PRICING_CL`** rate
+card (auto-refreshed from the Retail Prices API, so no manual price editing), flag unknown
+deployments in a **PRICE MISSING** tile instead of guessing a model, and use consistent windows.
+[`workbook/FoundryCostRoi.workbook`](workbook/FoundryCostRoi.workbook) is the App Insights
+`customMetrics` variant with an inline rate card you maintain in each query; use it only if your
+token metrics already flow to App Insights via `llm-emit-token-metric`.
+
 Just want one workbook in a setup you already run? Import it via **Monitor > Workbooks > New >
 Advanced Editor** (replace the `{workspace-id}` placeholder with your workspace resource id first),
 or deploy only the cost workbook:
@@ -272,10 +301,10 @@ let rates = datatable(family:string, inK:real, outK:real)["gpt-4o",0.0025,0.010,
 let cost = customMetrics
   | where name in ("Prompt Tokens","Completion Tokens")
   | extend dep = tostring(customDimensions.ModelDeploymentName)
-  | extend family = iff(dep has "mini","gpt-4o-mini","gpt-4o")
+  | extend family = case(dep has "mini","gpt-4o-mini", dep has "gpt-4o","gpt-4o", "unmapped")
   | summarize inTok=sumif(valueSum,name=="Prompt Tokens"), outTok=sumif(valueSum,name=="Completion Tokens") by dep, family
-  | lookup rates on family
-  | extend CostUsd = (inTok/1000.0*inK)+(outTok/1000.0*outK);
+  | lookup kind=leftouter rates on family
+  | extend CostUsd = (inTok/1000.0*coalesce(inK,0.0))+(outTok/1000.0*coalesce(outK,0.0));
 let evals = customEvents
   | where name == "gen_ai.evaluation"          // <-- your Foundry eval event name
   | extend dep = tostring(customDimensions.ModelDeploymentName), passed = tobool(customDimensions.passed)
@@ -294,8 +323,9 @@ source, same time range, three questions (what does it cost, is it safe, is it g
 - **Rates** are illustrative; replace them with your contract prices. The Log Analytics workbooks
   read the `PRICING_CL` table; the App Insights variant uses an inline `rates` datatable mapped by a
   `case()` on `ModelDeploymentName`.
-- **Billed vs estimate:** point the daily-spend / by-model queries at a **FOCUS cost export** for
-  invoice-accurate dollars instead of the rate-card estimate.
+- **Billed vs estimate:** for invoice-accurate dollars, reconcile against a **FOCUS export** with
+  [`queries/07-focus-reconciliation.kql`](queries/07-focus-reconciliation.kql) (per-day calibration
+  factor), or point the daily-spend / by-model queries directly at the export.
 - **Cache hit rate:** if your APIM policy does not emit Cached Tokens, use the native Azure OpenAI
   metric *Prompt Token Cache Match Rate* (see [`queries/04-cache-hit-rate.kql`](queries/04-cache-hit-rate.kql)).
 - **Workspace-based App Insights:** the `customMetrics` table is named `AppMetrics`.

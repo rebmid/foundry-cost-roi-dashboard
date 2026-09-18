@@ -15,7 +15,7 @@ let base = customMetrics
         dep has "gpt-4o",      "gpt-4o",
         dep has "gpt-5",       "gpt-5.x",
         dep has_any ("o1", "o3", "o4"), "o-series",
-        "gpt-4o")
+        "unmapped")
     | summarize inTok = sumif(valueSum, name == "Prompt Tokens"),
                 outTok = sumif(valueSum, name == "Completion Tokens")
              by family, bin(timestamp, 1d)
