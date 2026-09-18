@@ -22,6 +22,10 @@ near-real-time input / output / total tokens, faster than the log-based tiles. B
 this view) are spend by model, spend by subscription, spend over time, anomaly detection,
 budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-consumers table.
 
+![Spend by model, by subscription, and over time](docs/dashboard-breakdown.png)
+
+*Breakdown tiles: spend by model, spend by subscription (chargeback), and spend over time.*
+
 ## What you get
 
 | Panel | Source | Visual |
