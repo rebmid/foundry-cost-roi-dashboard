@@ -1,0 +1,173 @@
+﻿{
+    "version":  "Notebook/1.0",
+    "items":  [
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "# AI Cost and ROI (Foundry via APIM)\nToken counts from `ApiManagementGatewayLlmLog` priced by the `PRICING_CL` rate card (Azure list price, auto-refreshed from the Retail Prices API). This is the **Log Analytics** variant of the ROI workbook: it reads the finops-framework telemetry directly, so it works without the App Insights emit-token-metric path. Set **Hours saved / month** and **Loaded rate** to size the ROI."
+                                  },
+                      "name":  "header"
+                  },
+                  {
+                      "type":  9,
+                      "content":  {
+                                      "version":  "KqlParameterItem/1.0",
+                                      "parameters":  [
+                                                         {
+                                                             "id":  "tr",
+                                                             "version":  "KqlParameterItem/1.0",
+                                                             "name":  "TimeRange",
+                                                             "label":  "Time range",
+                                                             "type":  4,
+                                                             "isRequired":  true,
+                                                             "typeSettings":  {
+                                                                                  "selectableValues":  [
+                                                                                                           {
+                                                                                                               "durationMs":  604800000
+                                                                                                           },
+                                                                                                           {
+                                                                                                               "durationMs":  2592000000
+                                                                                                           },
+                                                                                                           {
+                                                                                                               "durationMs":  7776000000
+                                                                                                           }
+                                                                                                       ]
+                                                                              },
+                                                             "value":  {
+                                                                           "durationMs":  2592000000
+                                                                       }
+                                                         },
+                                                         {
+                                                             "id":  "hs",
+                                                             "version":  "KqlParameterItem/1.0",
+                                                             "name":  "HoursSaved",
+                                                             "label":  "Hours saved / month",
+                                                             "type":  1,
+                                                             "isRequired":  true,
+                                                             "value":  "1240"
+                                                         },
+                                                         {
+                                                             "id":  "lr",
+                                                             "version":  "KqlParameterItem/1.0",
+                                                             "name":  "LoadedRate",
+                                                             "label":  "Loaded rate ($/hr)",
+                                                             "type":  1,
+                                                             "isRequired":  true,
+                                                             "value":  "74"
+                                                         }
+                                                     ],
+                                      "style":  "pills",
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces"
+                                  },
+                      "name":  "parameters"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;let P = ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0;\r\nlet mtd = toscalar(P | summarize sum(Cost));\r\nlet tok = toscalar(P | summarize sum(TotalTokens));\r\nlet dNow = toreal(datetime_part(\u0027day\u0027, now()));\r\nlet dEnd = toreal(datetime_part(\u0027day\u0027, endofmonth(now())));\r\nprint ord=1, Metric=\u0027Month-to-date cost\u0027, Value=strcat(\u0027$\u0027, tostring(round(mtd, 2)))\r\n| union (print ord=2, Metric=\u0027Forecast (end of month)\u0027, Value=strcat(\u0027$\u0027, tostring(round(iff(dNow \u003e 0, mtd / dNow * dEnd, 0.0), 2))))\r\n| union (print ord=3, Metric=\u0027Cost per 1K tokens\u0027, Value=strcat(\u0027$\u0027, tostring(iff(tok \u003e 0, round(mtd / (todouble(tok) / 1000.0), 4), 0.0))))\r\n| union (print ord=4, Metric=\u0027Total tokens (MTD)\u0027, Value=tostring(tok))\r\n| order by ord asc\r\n| project Metric, Value",
+                                      "size":  4,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "tiles",
+                                      "tileSettings":  {
+                                                           "titleContent":  {
+                                                                                "columnMatch":  "Metric",
+                                                                                "formatter":  1
+                                                                            },
+                                                           "leftContent":  {
+                                                                               "columnMatch":  "Value",
+                                                                               "formatter":  1
+                                                                           },
+                                                           "showBorder":  true
+                                                       }
+                                  },
+                      "name":  "headline"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Daily AI spend with anomaly (last 30 days)"
+                                  },
+                      "name":  "h-daily"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| make-series DailyCost = sum(Cost) default=0 on TimeGenerated from startofday(ago(30d)) to now() step 1d\r\n| extend (flag, score, baseline) = series_decompose_anomalies(DailyCost, 1.5)\r\n| mv-expand TimeGenerated to typeof(datetime), DailyCost to typeof(double), baseline to typeof(double)\r\n| project TimeGenerated, [\u0027Daily cost (USD)\u0027] = round(DailyCost, 2), [\u0027Expected (baseline)\u0027] = round(baseline, 2)",
+                                      "size":  2,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "timechart"
+                                  },
+                      "name":  "daily-anomaly"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Spend by model (month to date)"
+                                  },
+                      "name":  "h-model"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| where TimeGenerated \u003e= startofmonth(now())\n| summarize [\u0027Cost (USD)\u0027] = round(sum(Cost), 2) by DeploymentName\n| order by [\u0027Cost (USD)\u0027] desc",
+                                      "size":  2,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "barchart"
+                                  },
+                      "name":  "spend-by-model",
+                      "customWidth":  "60"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Business value / ROI\nValue of time saved (hours x loaded rate) vs month-to-date agent token cost. Edit the two inputs in the pills above."
+                                  },
+                      "name":  "h-roi"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;let hoursSaved = todouble(\u0027{HoursSaved}\u0027);\r\nlet loadedRate = todouble(\u0027{LoadedRate}\u0027);\r\nlet agentCost = toscalar(ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| summarize sum(Cost));\r\nlet valueOfTime = hoursSaved * loadedRate;\r\nprint ord=1, Metric=\u0027Net ROI\u0027, Value=strcat(tostring(round(100.0 * (valueOfTime - agentCost) / max_of(agentCost, 1.0), 0)), \u0027%\u0027)\r\n| union (print ord=2, Metric=\u0027Hours saved (this month)\u0027, Value=tostring(hoursSaved))\r\n| union (print ord=3, Metric=\u0027Value of time saved\u0027, Value=strcat(\u0027$\u0027, tostring(round(valueOfTime, 0))))\r\n| union (print ord=4, Metric=\u0027Agent run cost (MTD)\u0027, Value=strcat(\u0027$\u0027, tostring(round(agentCost, 2))))\r\n| union (print ord=5, Metric=\u0027Payback (share of value)\u0027, Value=iff(valueOfTime \u003c= 0, \u0027n/a\u0027, tostring(round(agentCost / valueOfTime, 3))))\r\n| order by ord asc\r\n| project Metric, Value",
+                                      "size":  3,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "table"
+                                  },
+                      "name":  "roi",
+                      "customWidth":  "40"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Token volume by type (Input / Output)"
+                                  },
+                      "name":  "h-tokens"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| summarize [\u0027Input tokens\u0027] = sum(PromptTokens), [\u0027Output tokens\u0027] = sum(CompletionTokens) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc",
+                                      "size":  2,
+                                      "timeContextFromParameter":  "TimeRange",
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "barchart"
+                                  },
+                      "name":  "token-volume"
+                  }
+              ],
+    "isLocked":  false,
+    "fallbackResourceIds":  [
+                                "{workspace-id}"
+                            ],
+    "$schema":  "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"
+}
