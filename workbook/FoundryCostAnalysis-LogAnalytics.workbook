@@ -97,6 +97,69 @@
                   {
                       "type":  1,
                       "content":  {
+                                      "json":  "## Month to date\nFixed window from the first of the current month to now. The **Time range** picker above does not apply to these three tiles; the **Subscription** picker still does. Projected month-end is a run-rate: (spend so far / days elapsed) x days in the month."
+                                  },
+                      "name":  "h-mtd"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;let P = ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| where \u0027*\u0027 in ({Subscription}) or Team in ({Subscription})\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0;\r\nlet mtd = toscalar(P | summarize sum(Cost));\r\nlet elapsed = (now() - startofmonth(now())) / 1d;\r\nlet inMonth = (datetime_add(\u0027month\u0027, 1, startofmonth(now())) - startofmonth(now())) / 1d;\r\nlet projected = iff(elapsed \u003e 0, mtd / elapsed * inMonth, 0.0);\r\nunion\r\n (print Name=\u0027Spend month-to-date (USD)\u0027, Value=tostring(round(mtd, 2)), Order=1),\r\n (print Name=\u0027Projected month-end (USD)\u0027, Value=tostring(round(projected, 2)), Order=2),\r\n (print Name=\u0027Avg spend / day (USD)\u0027, Value=tostring(iff(elapsed \u003e 0, round(mtd / elapsed, 2), 0.0)), Order=3)\r\n| order by Order asc\r\n| project Name, Value",
+                                      "size":  4,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "tiles",
+                                      "tileSettings":  {
+                                                           "titleContent":  {
+                                                                                "columnMatch":  "Name",
+                                                                                "formatter":  1
+                                                                            },
+                                                           "leftContent":  {
+                                                                               "columnMatch":  "Value",
+                                                                               "formatter":  1
+                                                                           },
+                                                           "showBorder":  true
+                                                       }
+                                  },
+                      "name":  "kpi-mtd"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Spend this month: per day and cumulative\nEach bar is one day of list-price spend; the area chart is the running total (burn-up) toward the projected month-end above. Fixed to the current calendar month, scoped by the **Subscription** picker."
+                                  },
+                      "name":  "h-mtd-charts"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| where \u0027*\u0027 in ({Subscription}) or Team in ({Subscription})\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| summarize [\u0027Cost (USD)\u0027] = round(sum(Cost), 4) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc",
+                                      "size":  2,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "barchart"
+                                  },
+                      "name":  "mtd-daily",
+                      "customWidth":  "50"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| where \u0027*\u0027 in ({Subscription}) or Team in ({Subscription})\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| summarize Daily = sum(Cost) by bin(TimeGenerated, 1d)\n| order by TimeGenerated asc\n| serialize [\u0027Cumulative spend (USD)\u0027] = round(row_cumsum(Daily), 4)\n| project TimeGenerated, [\u0027Cumulative spend (USD)\u0027]",
+                                      "size":  2,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "areachart"
+                                  },
+                      "name":  "mtd-cumulative",
+                      "customWidth":  "50"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
                                       "json":  "## Live token volume (platform metrics, ~1 min)\nSourced from `AzureMetrics` (platform metrics routed to this workspace). Faster than the log tiles below, but model-level only and **not filtered by the Subscription picker** (platform metrics carry no subscription dimension). For the true 1-minute view, open **Metrics** on the Foundry resource."
                                   },
                       "name":  "h-live"
@@ -151,7 +214,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Spend over time (by model)"
+                                      "json":  "## Spend over time by model (fine-grained, follows the Time range picker above)\nHourly bins within the selected **Time range**. Use this to drill into a spike; use the **Month to date** section above for the monthly money view."
                                   },
                       "name":  "h-trend"
                   },
@@ -159,7 +222,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| where \u0027*\u0027 in ({Subscription}) or Team in ({Subscription})\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| summarize [\u0027Cost (USD)\u0027] = round(sum(Cost), 4) by bin(TimeGenerated, 5m), DeploymentName",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| where \u0027*\u0027 in ({Subscription}) or Team in ({Subscription})\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0| summarize [\u0027Cost (USD)\u0027] = round(sum(Cost), 4) by bin(TimeGenerated, 1h), DeploymentName",
                                       "size":  2,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
