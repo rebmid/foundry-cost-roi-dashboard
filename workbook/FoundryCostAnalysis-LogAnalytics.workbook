@@ -4,7 +4,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "# AI Cost and Chargeback (Foundry via APIM)\nTokens from `ApiManagementGatewayLlmLog` priced with the **editable Rate card** parameter (USD per 1K tokens, no re-ingestion needed) and attributed to APIM subscriptions (teams). Set a **discount** (default 0% = list) for effective vs list cost. Numbers are small here because this is synthetic demo traffic."
+                                      "json":  "# AI Cost and Chargeback (Foundry via APIM)\nTokens from `ApiManagementGatewayLlmLog` priced with the **editable Rate card** parameter (USD per 1K tokens) and attributed to APIM subscriptions (teams). Set a **discount** (default 0% = list). Numbers are small here because this is synthetic demo traffic."
                                   },
                       "name":  "header"
                   },
@@ -75,7 +75,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);let P = ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostEff = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0);\r\nlet cl = toscalar(P | summarize sum(CostList));\r\nlet ce = toscalar(P | summarize sum(CostEff));\r\nlet t = toscalar(P | summarize sum(TotalTokens));\r\nlet n = toscalar(P | summarize count());\r\nunion\r\n (print Name=\u0027Effective cost (USD)\u0027, Value=tostring(round(ce, 2)), Order=1),\r\n (print Name=\u0027List cost (USD)\u0027, Value=tostring(round(cl, 2)), Order=2),\r\n (print Name=\u0027Discount applied\u0027, Value=strcat(\u0027{EDP}\u0027, \u0027%\u0027), Order=3),\r\n (print Name=\u0027Total tokens\u0027, Value=tostring(t), Order=4),\r\n (print Name=\u0027Calls\u0027, Value=tostring(n), Order=5),\r\n (print Name=\u0027Cost / 1K tokens (USD)\u0027, Value=tostring(iff(t \u003e 0, round(ce / (todouble(t) / 1000.0), 4), 0.0)), Order=6)\r\n| order by Order asc\r\n| project Name, Value",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);let P = ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostEff = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0);\r\nlet cl = toscalar(P | summarize sum(CostList));\r\nlet ce = toscalar(P | summarize sum(CostEff));\r\nlet t = toscalar(P | summarize sum(TotalTokens));\r\nlet n = toscalar(P | summarize count());\r\nunion\r\n (print Name=\u0027Effective cost (USD)\u0027, Value=tostring(round(ce, 2)), Order=1),\r\n (print Name=\u0027List cost (USD)\u0027, Value=tostring(round(cl, 2)), Order=2),\r\n (print Name=\u0027Discount applied\u0027, Value=strcat(\u0027{EDP}\u0027, \u0027%\u0027), Order=3),\r\n (print Name=\u0027Total tokens\u0027, Value=tostring(t), Order=4),\r\n (print Name=\u0027Calls\u0027, Value=tostring(n), Order=5),\r\n (print Name=\u0027Cost / 1K tokens (USD)\u0027, Value=tostring(iff(t \u003e 0, round(ce / (todouble(t) / 1000.0), 4), 0.0)), Order=6)\r\n| order by Order asc\r\n| project Name, Value",
                                       "size":  4,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -98,6 +98,25 @@
                   {
                       "type":  1,
                       "content":  {
+                                      "json":  "## Live token volume (platform metrics, ~1 min)\nSourced from `AzureMetrics` (platform metrics routed to this workspace). Faster than the log tiles below, but model-level only (metrics carry no team dimension). For the true 1-minute view, open **Metrics** on the Foundry resource."
+                                  },
+                      "name":  "h-live"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "AzureMetrics\r\n| where ResourceProvider =~ \u0027MICROSOFT.COGNITIVESERVICES\u0027\r\n| where MetricName in (\u0027TotalTokens\u0027,\u0027InputTokens\u0027,\u0027OutputTokens\u0027)\r\n| summarize Tokens = sum(Total) by bin(TimeGenerated, 1m), MetricName\r\n| order by TimeGenerated asc",
+                                      "size":  2,
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "timechart"
+                                  },
+                      "name":  "live-metrics"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
                                       "json":  "## Where the money goes (effective cost)"
                                   },
                       "name":  "h-breakdown"
@@ -106,7 +125,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by DeploymentName\n| order by [\u0027Cost (USD)\u0027] desc",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by DeploymentName\n| order by [\u0027Cost (USD)\u0027] desc",
                                       "size":  1,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -120,7 +139,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by Team\n| order by [\u0027Cost (USD)\u0027] desc",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by Team\n| order by [\u0027Cost (USD)\u0027] desc",
                                       "size":  1,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -141,7 +160,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by bin(TimeGenerated, 5m), DeploymentName",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Cost (USD)\u0027] = round(sum(CostUSD), 4) by bin(TimeGenerated, 5m), DeploymentName",
                                       "size":  2,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -161,7 +180,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend CostUSD = ((PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0) * (1 - todouble(\u0027{EDP}\u0027) / 100.0)\r\n| make-series Spend = sum(CostUSD) default=0 on TimeGenerated from ago(1d) to now() step 30m\r\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Spend, 1.5)\r\n| mv-expand TimeGenerated to typeof(datetime), Spend to typeof(double), baseline to typeof(double)\r\n| project TimeGenerated, [\u0027Actual spend (USD)\u0027] = Spend, [\u0027Expected (baseline)\u0027] = baseline",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostUSD = ((PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0) * (1 - todouble(\u0027{EDP}\u0027) / 100.0)\r\n| make-series Spend = sum(CostUSD) default=0 on TimeGenerated from ago(1d) to now() step 30m\r\n| extend (anomalies, score, baseline) = series_decompose_anomalies(Spend, 1.5)\r\n| mv-expand TimeGenerated to typeof(datetime), Spend to typeof(double), baseline to typeof(double)\r\n| project TimeGenerated, [\u0027Actual spend (USD)\u0027] = Spend, [\u0027Expected (baseline)\u0027] = baseline",
                                       "size":  2,
                                       "queryType":  0,
                                       "resourceType":  "microsoft.operationalinsights/workspaces",
@@ -180,7 +199,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize CostUSD = sum(CostUSD) by Team\r\n| join kind=inner (SUBSCRIPTION_QUOTA_CL | summarize arg_max(TimeGenerated, *) by Subscription | project Team = Subscription, CostQuota) on Team\r\n| extend PctUsed = round(100.0 * CostUSD / CostQuota, 1)\r\n| extend Status = case(PctUsed \u003e= 100, \u0027OVER BUDGET\u0027, PctUsed \u003e= 80, \u0027Warning\u0027, \u0027OK\u0027)\r\n| project Team, [\u0027Spend (USD)\u0027] = round(CostUSD, 4), [\u0027Quota (USD)\u0027] = CostQuota, [\u0027% used\u0027] = PctUsed, Status\r\n| order by [\u0027% used\u0027] desc",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize CostUSD = sum(CostUSD) by Team\r\n| join kind=inner (SUBSCRIPTION_QUOTA_CL | summarize arg_max(TimeGenerated, *) by Subscription | project Team = Subscription, CostQuota) on Team\r\n| extend PctUsed = round(100.0 * CostUSD / CostQuota, 1)\r\n| extend Status = case(PctUsed \u003e= 100, \u0027OVER BUDGET\u0027, PctUsed \u003e= 80, \u0027Warning\u0027, \u0027OK\u0027)\r\n| project Team, [\u0027Spend (USD)\u0027] = round(CostUSD, 4), [\u0027Quota (USD)\u0027] = CostQuota, [\u0027% used\u0027] = PctUsed, Status\r\n| order by [\u0027% used\u0027] desc",
                                       "size":  2,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -188,6 +207,26 @@
                                       "visualization":  "table"
                                   },
                       "name":  "budget"
+                  },
+                  {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Data quality: deployments with no rate-card entry (PRICE MISSING)\nThese calls are counted but priced at 0 because no rate-card row matches the deployment name. Add them to the Rate card parameter. Empty table = every model is priced."
+                                  },
+                      "name":  "h-unmapped"
+                  },
+                  {
+                      "type":  3,
+                      "content":  {
+                                      "version":  "KqlItem/1.0",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| where PriceMissing\n| summarize Calls = count(), [\u0027Unpriced tokens\u0027] = sum(TotalTokens) by DeploymentName\n| order by Calls desc",
+                                      "size":  1,
+                                      "timeContextFromParameter":  "TimeRange",
+                                      "queryType":  0,
+                                      "resourceType":  "microsoft.operationalinsights/workspaces",
+                                      "visualization":  "table"
+                                  },
+                      "name":  "unmapped"
                   },
                   {
                       "type":  1,
@@ -200,7 +239,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Prompt tokens\u0027] = sum(PromptTokens), [\u0027Completion tokens\u0027] = sum(CompletionTokens) by DeploymentName\n| order by [\u0027Prompt tokens\u0027] desc",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize [\u0027Prompt tokens\u0027] = sum(PromptTokens), [\u0027Completion tokens\u0027] = sum(CompletionTokens) by DeploymentName\n| order by [\u0027Prompt tokens\u0027] desc",
                                       "size":  1,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -214,7 +253,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=inner rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize Calls = count(), [\u0027Input tokens\u0027] = sum(PromptTokens), [\u0027Output tokens\u0027] = sum(CompletionTokens), [\u0027List (USD)\u0027] = round(sum(CostList), 4), [\u0027Effective (USD)\u0027] = round(sum(CostUSD), 4) by Team, DeploymentName\n| order by [\u0027Effective (USD)\u0027] desc",
+                                      "query":  "let rateCard = print rc = todynamic(\u0027{RateCard}\u0027)\r\n| mv-expand rc\r\n| project Model = tostring(rc[\u0027model\u0027]), InputTokensPrice = todouble(rc[\u0027in\u0027]), OutputTokensPrice = todouble(rc[\u0027out\u0027]);ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| join kind=leftouter (ApiManagementGatewayLogs | project CorrelationId, ApimSubscriptionId) on CorrelationId\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend Team = coalesce(ApimSubscriptionId, \u0027unknown\u0027), PriceMissing = isnull(InputTokensPrice)\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend CostList = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| extend CostUSD = CostList * (1 - todouble(\u0027{EDP}\u0027) / 100.0)| summarize Calls = count(), [\u0027Input tokens\u0027] = sum(PromptTokens), [\u0027Output tokens\u0027] = sum(CompletionTokens), [\u0027List (USD)\u0027] = round(sum(CostList), 4), [\u0027Effective (USD)\u0027] = round(sum(CostUSD), 4) by Team, DeploymentName\n| order by [\u0027Effective (USD)\u0027] desc",
                                       "size":  1,
                                       "timeContextFromParameter":  "TimeRange",
                                       "queryType":  0,
@@ -227,7 +266,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Quality and safety: turn spend into unit economics\nNo Foundry evaluation or Purview DLP data is flowing in this lab yet. Once you run Foundry evals (or the AI-Gateway *Foundry Models Evals* lab) and export results to this workspace, add a **cost per passing eval** tile, and a **spend-at-risk** tile from Purview DLP events. The runnable join queries are in the [foundry-cost-roi-dashboard](https://github.com/rebmid/foundry-cost-roi-dashboard) README (Governance section)."
+                                      "json":  "## Quality and safety: turn spend into unit economics\nNo Foundry evaluation or Purview DLP data is flowing yet. Once you run Foundry evals or Purview DLP at the gateway, add a **cost per passing eval** tile and a **spend-at-risk** tile. Runnable join queries are in the [foundry-cost-roi-dashboard](https://github.com/rebmid/foundry-cost-roi-dashboard) README (Governance section)."
                                   },
                       "name":  "h-quality"
                   }
