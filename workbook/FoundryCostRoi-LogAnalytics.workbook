@@ -54,6 +54,15 @@
                                                              "type":  1,
                                                              "isRequired":  true,
                                                              "value":  "74"
+                                                         },
+                                                         {
+                                                             "id":  "pc",
+                                                             "version":  "KqlParameterItem/1.0",
+                                                             "name":  "PlatformCostMonthly",
+                                                             "label":  "Platform cost ($/month)",
+                                                             "type":  1,
+                                                             "isRequired":  true,
+                                                             "value":  "0"
                                                          }
                                                      ],
                                       "style":  "pills",
@@ -127,7 +136,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Business value / ROI\nValue of time saved (hours x loaded rate) vs month-to-date agent token cost. The **Hours saved / month** and **Loaded rate** defaults are examples: set them to your own figures in the pills above, so the ROI is illustrative until real inputs are entered."
+                                      "json":  "## Business value / ROI\nValue of time saved (hours x loaded rate) vs month-to-date agent cost. Set **Hours saved / month**, **Loaded rate**, and **Platform cost / month** (APIM + Log Analytics + App Insights + Foundry hosting) in the pills; the model token cost is added automatically. The defaults are examples, so the ROI is illustrative until you enter real figures. Net ROI shows **n/a** when monthly spend is under $1 (too small to be meaningful)."
                                   },
                       "name":  "h-roi"
                   },
@@ -135,7 +144,7 @@
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
-                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;let hoursSaved = todouble(\u0027{HoursSaved}\u0027);\r\nlet loadedRate = todouble(\u0027{LoadedRate}\u0027);\r\nlet agentCost = toscalar(ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| summarize sum(Cost));\r\nlet valueOfTime = hoursSaved * loadedRate;\r\nprint ord=1, Metric=\u0027Net ROI\u0027, Value=strcat(tostring(round(100.0 * (valueOfTime - agentCost) / max_of(agentCost, 1.0), 0)), \u0027%\u0027)\r\n| union (print ord=2, Metric=\u0027Hours saved (this month)\u0027, Value=tostring(hoursSaved))\r\n| union (print ord=3, Metric=\u0027Value of time saved\u0027, Value=strcat(\u0027$\u0027, tostring(round(valueOfTime, 0))))\r\n| union (print ord=4, Metric=\u0027Agent run cost (MTD)\u0027, Value=strcat(\u0027$\u0027, tostring(round(agentCost, 2))))\r\n| union (print ord=5, Metric=\u0027Payback (share of value)\u0027, Value=iff(valueOfTime \u003c= 0, \u0027n/a\u0027, tostring(round(agentCost / valueOfTime, 3))))\r\n| order by ord asc\r\n| project Metric, Value",
+                                      "query":  "let rateCard = PRICING_CL | summarize arg_max(TimeGenerated, *) by Model | project Model, InputTokensPrice, OutputTokensPrice;let hoursSaved = todouble(\u0027{HoursSaved}\u0027);\r\nlet loadedRate = todouble(\u0027{LoadedRate}\u0027);\r\nlet platformCost = todouble(\u0027{PlatformCostMonthly}\u0027);\r\nlet tokenCost = toscalar(ApiManagementGatewayLlmLog\r\n| where DeploymentName != \u0027\u0027\r\n| where TimeGenerated \u003e= startofmonth(now())\r\n| join kind=leftouter rateCard on $left.DeploymentName == $right.Model\r\n| extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)\r\n| extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0\r\n| summarize sum(Cost));\r\nlet agentCost = coalesce(tokenCost, 0.0) + platformCost;\r\nlet valueOfTime = hoursSaved * loadedRate;\r\nprint ord=1, Metric=\u0027Net ROI\u0027, Value=iff(agentCost \u003c 1.0, \u0027n/a (spend \u003c $1, illustrative)\u0027, strcat(tostring(round(100.0 * (valueOfTime - agentCost) / agentCost, 0)), \u0027%\u0027))\r\n| union (print ord=2, Metric=\u0027Hours saved (this month)\u0027, Value=tostring(hoursSaved))\r\n| union (print ord=3, Metric=\u0027Value of time saved\u0027, Value=strcat(\u0027$\u0027, tostring(round(valueOfTime, 0))))\r\n| union (print ord=4, Metric=\u0027Agent run cost (MTD: tokens + platform)\u0027, Value=strcat(\u0027$\u0027, tostring(round(agentCost, 2))))\r\n| union (print ord=5, Metric=\u0027  of which model tokens\u0027, Value=strcat(\u0027$\u0027, tostring(round(coalesce(tokenCost, 0.0), 2))))\r\n| union (print ord=6, Metric=\u0027Payback (share of value)\u0027, Value=iff(valueOfTime \u003c= 0 or agentCost \u003c 1.0, \u0027n/a\u0027, tostring(round(agentCost / valueOfTime, 3))))\r\n| order by ord asc\r\n| project Metric, Value",
                                       "size":  3,
                                       "queryType":  0,
                                       "resourceType":  "microsoft.operationalinsights/workspaces",

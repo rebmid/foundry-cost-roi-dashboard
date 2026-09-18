@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-json:
+    name: Validate workbook and Grafana JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s globstar nullglob
+          files=( **/*.workbook grafana/**/*.json infra/workbooks/*.json )
+          if [ ${#files[@]} -eq 0 ]; then echo "No JSON assets found"; exit 1; fi
+          for f in "${files[@]}"; do
+            echo "Checking $f"
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+          done
+          echo "All JSON assets are valid."
+
+  build-bicep:
+    name: Build Bicep templates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Bicep CLI
+        run: az bicep install
+      - name: Build templates
+        run: |
+          set -euo pipefail
+          for t in infra/main.bicep infra/existing-apim.bicep; do
+            echo "Building $t"
+            az bicep build --file "$t" --outdir "${RUNNER_TEMP}"
+          done
+          echo "All Bicep templates compiled."

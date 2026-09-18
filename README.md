@@ -66,11 +66,11 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 
 ![Foundry Cost & ROI workbook overview](docs/roi-overview.png)
 
-*The Log Analytics ROI variant ([`workbook/FoundryCostRoi-LogAnalytics.workbook`](workbook/FoundryCostRoi-LogAnalytics.workbook)): month-to-date cost, run-rate forecast, cost per 1K tokens, and total tokens; a daily spend + anomaly trend; and spend by model. Two pills, **Hours saved / month** and **Loaded rate ($/hr)**, size the ROI.*
+*The Log Analytics ROI variant ([`workbook/FoundryCostRoi-LogAnalytics.workbook`](workbook/FoundryCostRoi-LogAnalytics.workbook)): month-to-date cost, run-rate forecast, cost per 1K tokens, and total tokens; a daily spend + anomaly trend; and spend by model. Three pills, **Hours saved / month**, **Loaded rate ($/hr)**, and **Platform cost / month**, size the ROI.*
 
 ![Business value and ROI, and token volume by type](docs/roi-workbook.png)
 
-*Business value / ROI (value of time saved = hours x loaded rate, vs month-to-date token cost) and token volume split into input vs output. See [ROI model](docs/roi-model.md) for what the two inputs mean and the exact math.*
+*Business value / ROI (value of time saved = hours x loaded rate, vs month-to-date run cost: model tokens plus an optional platform-cost input) and token volume split into input vs output. Net ROI reads **n/a** below $1 of monthly spend, so a few cents of lab traffic does not show a meaningless multi-million-percent figure. See [ROI model](docs/roi-model.md) for what the inputs mean and the exact math.*
 
 ### Alerts workbook (operational)
 
@@ -198,8 +198,9 @@ cost per 1K), month-to-date spend + forecast + burn-up, spend by model, spend by
 spend over time, **anomaly detection** (actual vs expected), a **live token tile** from platform
 metrics, **budget vs actual** (OVER BUDGET / Warning / OK), a **PRICE MISSING** data-quality tile,
 token split, and a top-consumers table. The **Foundry Cost & ROI** workbook adds the ROI panel
-(hours saved x loaded rate vs token cost); see [ROI model](docs/roi-model.md) for what the two
-inputs mean and how to set them. Costs are Azure list price.
+(hours saved x loaded rate vs run cost = model tokens plus an optional **Platform cost / month** for
+APIM, Log Analytics, App Insights, and Foundry hosting; Net ROI reads **n/a** below $1 of spend);
+see [ROI model](docs/roi-model.md) for what the inputs mean and how to set them. Costs are Azure list price.
 
 The two **Log Analytics** workbooks are the recommended ones: they read the **`PRICING_CL`** rate
 card (auto-refreshed from the Retail Prices API, so no manual price editing), flag unknown
@@ -336,6 +337,8 @@ source, same time range, three questions (what does it cost, is it safe, is it g
 - **Cache hit rate:** if your APIM policy does not emit Cached Tokens, use the native Azure OpenAI
   metric *Prompt Token Cache Match Rate* (see [`queries/04-cache-hit-rate.kql`](queries/04-cache-hit-rate.kql)).
 - **Workspace-based App Insights:** the `customMetrics` table is named `AppMetrics`.
+- **Continuous integration:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) compiles the
+  Bicep templates and validates every workbook / Grafana JSON on each push and pull request.
 - No customer-specific data is included; this is a reusable template.
 
 ## License

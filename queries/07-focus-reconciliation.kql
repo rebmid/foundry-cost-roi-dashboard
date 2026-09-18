@@ -20,15 +20,27 @@ let estimated =
     | extend InputTokensPrice = coalesce(InputTokensPrice, 0.0), OutputTokensPrice = coalesce(OutputTokensPrice, 0.0)
     | extend Cost = (PromptTokens * InputTokensPrice + CompletionTokens * OutputTokensPrice) / 1000.0
     | summarize EstimatedCost = sum(Cost) by Day = startofday(TimeGenerated);
-// ---- 2. Actual billed cost from the FOCUS export (AI services only) ----
-// FOCUS 1.0 columns: BilledCost, EffectiveCost, ServiceName, ServiceCategory, ChargePeriodStart.
-// Replace the URL with your FOCUS export blob(s); h@ uses the file's SAS token.
+// ---- 2. Actual billed cost from the FOCUS export ----
+// FOCUS 1.0 columns: BilledCost, EffectiveCost, ServiceName, ServiceCategory, ResourceId, ChargePeriodStart.
+// IMPORTANT: scope this to the SAME Azure OpenAI / Foundry resources that sit behind your APIM
+// gateway, otherwise unrelated AI spend pollutes the calibration factor. List those resource ids
+// (lowercase) in aiResourceIds; leave it empty to fall back to a broad AI-service filter.
+let aiResourceIds = dynamic([
+    // "/subscriptions/<sub>/resourcegroups/<rg>/providers/microsoft.cognitiveservices/accounts/<foundry>"
+]);
 let billed =
-    externaldata(BilledCost:real, EffectiveCost:real, ServiceName:string, ServiceCategory:string, ChargePeriodStart:datetime)
+    externaldata(BilledCost:real, EffectiveCost:real, ServiceName:string, ServiceCategory:string, ResourceId:string, ChargePeriodStart:datetime)
     [ h@'https://<account>.blob.core.windows.net/<container>/<focus-export>.csv' ]
     with (format='csv', ignoreFirstRecord=true)
-    | where ServiceCategory == 'AI and Machine Learning' or ServiceName has_any ('OpenAI', 'Azure AI', 'Cognitive')
+    | where (array_length(aiResourceIds) > 0 and set_has_element(aiResourceIds, tolower(ResourceId)))
+         or (array_length(aiResourceIds) == 0 and (ServiceCategory == 'AI and Machine Learning' or ServiceName has_any ('OpenAI', 'Azure AI', 'Cognitive')))
     | summarize BilledCost = sum(EffectiveCost) by Day = startofday(ChargePeriodStart);
+// Alternative (FinOps hub / Azure Data Explorer): if you deployed the FinOps hub, replace the
+// externaldata() block above with a query over the hub's Costs table (no blob URL needed):
+//   let billed = Costs
+//     | where (array_length(aiResourceIds) > 0 and set_has_element(aiResourceIds, tolower(ResourceId)))
+//          or (array_length(aiResourceIds) == 0 and ServiceCategory == 'AI and Machine Learning')
+//     | summarize BilledCost = sum(EffectiveCost) by Day = startofday(ChargePeriodStart);
 // ---- 3. Reconcile: estimate vs billed, variance, and calibration factor ----
 estimated
 | join kind=fullouter billed on Day

@@ -28,7 +28,7 @@ let base = customMetrics
     | extend costUsd = (inTok / 1000.0 * coalesce(inK, 0.0)) + (outTok / 1000.0 * coalesce(outK, 0.0));
 let valueOfTime = hoursSaved * loadedRate;
 let agentCost = toscalar(base | summarize sum(costUsd));
-print ord = 1, Metric = "Net ROI", Value = strcat(tostring(round(100.0 * (valueOfTime - agentCost) / max_of(agentCost, 1.0), 0)), "%")
+print ord = 1, Metric = "Net ROI", Value = iff(agentCost < 1.0, "n/a (spend < $1, illustrative)", strcat(tostring(round(100.0 * (valueOfTime - agentCost) / agentCost, 0)), "%"))
 | union (print ord = 2, Metric = "Hours saved / period", Value = tostring(hoursSaved))
 | union (print ord = 3, Metric = "Value of time saved", Value = strcat("$", tostring(round(valueOfTime, 0))))
 | union (print ord = 4, Metric = "Agent run cost", Value = strcat("$", tostring(round(agentCost, 0))))
