@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "apimSku": { "value": "Basicv2" },
+    "aiServicesConfig": { "value": [ { "name": "foundry1", "location": "swedencentral" } ] },
+    "modelsConfig": { "value": [
+      { "name": "gpt-4.1-mini", "publisher": "OpenAI", "version": "2025-04-14", "sku": "GlobalStandard", "capacity": 200, "inputTokensMeterSku": "gpt 4.1 mini Inp glbl", "outputTokensMeterSku": "gpt 4.1 mini Outp glbl" },
+      { "name": "gpt-4.1", "publisher": "OpenAI", "version": "2025-04-14", "sku": "GlobalStandard", "capacity": 200, "inputTokensMeterSku": "gpt 4.1 Inp glbl", "outputTokensMeterSku": "gpt 4.1 Outp glbl" },
+      { "name": "DeepSeek-V3.2", "publisher": "DeepSeek", "version": "1", "sku": "GlobalStandard", "capacity": 100, "inputTokensMeterSku": "V3.2 Inp glbl", "outputTokensMeterSku": "V3.2 Outp glbl" }
+    ] },
+    "apimUsersConfig": { "value": [] },
+    "apimSubscriptionsConfig": { "value": [
+      { "name": "subscription1", "displayName": "Subscription 1", "product": "platinum" },
+      { "name": "subscription2", "displayName": "Subscription 2", "product": "gold" },
+      { "name": "subscription3", "displayName": "Subscription 3", "product": "silver" },
+      { "name": "subscription4", "displayName": "Subscription 4", "product": "silver" }
+    ] },
+    "apimProductsConfig": { "value": [
+      { "name": "platinum", "displayName": "Platinum Product", "tpm": 2000, "tokenQuota": 1000000, "tokenQuotaPeriod": "Monthly", "costQuota": 0.015 },
+      { "name": "gold", "displayName": "Gold Product", "tpm": 1000, "tokenQuota": 1000000, "tokenQuotaPeriod": "Monthly", "costQuota": 0.010 },
+      { "name": "silver", "displayName": "Silver Product", "tpm": 500, "tokenQuota": 1000000, "tokenQuotaPeriod": "Monthly", "costQuota": 0.005 }
+    ] },
+    "inferenceAPIPath": { "value": "inference" },
+    "inferenceAPIType": { "value": "AzureOpenAI" },
+    "foundryProjectName": { "value": "finops-framework" }
+  }
+}

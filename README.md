@@ -6,6 +6,11 @@ adds a **rate card** to get the *dollars*, plus a chargeback dimension and an RO
 panel. It fills the Foundry gap that Copilot-focused tools (Consumption Central,
 ValueLens) do not cover.
 
+**Standalone:** the [`infra/`](infra/) folder deploys the entire platform end to end (an
+APIM AI gateway, per-team token throttling, budget auto-disable, Foundry model deployments,
+sample teams, and both workbooks). No external accelerator required. Or drop a single
+workbook into an existing Azure Monitor setup (see the workbook import steps below).
+
 > The key idea: **Azure Monitor gives token counts; you add a rate card to get the
 > dollars.** It is one workbook assembled from four data sources, panel by panel.
 
@@ -40,6 +45,30 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 | Prompt cache hit rate | native metric *Prompt Token Cache Match Rate* (or emitted Cached Tokens) | KPI tile |
 | Token volume by type | Prompt / Completion / Cached tokens | stacked column |
 | Business value / ROI | tokens -> cost vs. business inputs (hours saved x loaded rate) | KPI + table |
+
+## Deploy the full platform (standalone)
+
+The [`infra/`](infra/) folder is a complete, self-contained deployment: an APIM AI gateway
+in front of Azure AI Foundry, per-product (per-team) `llm-token-limit` throttling, the
+`azure-openai-emit-token-metric` policy, Foundry model deployments, the `PRICING_CL` +
+`SUBSCRIPTION_QUOTA_CL` tables (with data collection rules), all four workbooks (Cost
+Analysis, Foundry Cost & ROI, Azure OpenAI Insights, Alerts), a portal dashboard, three
+sample products (platinum/gold/silver) with four sample team subscriptions, and a **Logic
+App + scheduled-query rules that auto-disable any team that exceeds its cost quota**.
+
+```powershell
+# 1. Deploy the platform
+./infra/deploy.ps1 -Subscription <your-sub-id>
+
+# 2. Populate prices/quotas and generate sample traffic
+#    (pip install azure-identity azure-monitor-ingestion requests openai)
+python infra/postdeploy.py --subscription <your-sub-id> --resource-group finops-standalone --deployment finops-standalone
+```
+
+Edit [`infra/params.json`](infra/params.json) to change the models, APIM SKU, products, and
+quotas. Costs are Azure **list** price; for an enterprise discount, scale the input/output
+prices before they are written to `PRICING_CL`. Tear down with
+`az group delete -n finops-standalone -y`.
 
 ## Architecture (four sources into one workbook)
 
@@ -89,11 +118,12 @@ Cost Management ──(FOCUS export)──► Storage (real billed $, optional) 
 
 | File | Reads from | Best for |
 |---|---|---|
-| [`workbook/FoundryCostRoi.workbook`](workbook/FoundryCostRoi.workbook) | App Insights `customMetrics` (APIM `llm-emit-token-metric`) | ROI + unit economics; per-team via a `Team` dimension |
-| [`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced from the `PRICING_CL` rates table | Chargeback + budget vs actual when you deploy the finops-framework lab |
+| [`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced from `PRICING_CL` | Chargeback + budget vs actual (deployed by `infra/`) |
+| [`workbook/FoundryCostRoi-LogAnalytics.workbook`](workbook/FoundryCostRoi-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced from `PRICING_CL` | ROI + unit economics with no extra plumbing (deployed by `infra/`) |
+| [`workbook/FoundryCostRoi.workbook`](workbook/FoundryCostRoi.workbook) | App Insights `customMetrics` (APIM `llm-emit-token-metric`) | ROI when you already emit token metrics to App Insights |
 
-The second one is the drop-in upgrade for the finops-framework lab's thin stock "Cost
-Analysis" workbook, and it works for **any** finops-framework deployment: prices from the
+The Log Analytics cost workbook is what `infra/` deploys as **Cost Analysis** (it also drops
+into any finops-framework-style setup): it prices from the
 **`PRICING_CL` rates table** (refresh it from the Azure Retail Prices API instead of
 hand-editing), a KPI strip (cost, tokens, calls, cost per 1K), spend by model, spend by
 team, spend over time, **spend anomaly detection** (actual vs expected), a **live token tile
@@ -234,38 +264,24 @@ Add either query as a new tile (Workbook) or panel (Grafana) next to the cost ti
 data source, same time range. That is the whole pairing: one gateway, one telemetry store,
 three questions (what does it cost, is it safe, is it good) answered off the same rows.
 
-## Don't build from scratch: deploy the official accelerator
+## What gets deployed (infra/)
 
-The Azure-Samples **FinOps Framework** lab is the closest official accelerator, and unlike
-a counts-only workbook it already **shows cost in dollars** and **enforces budgets**:
+Everything in this repo deploys from [`infra/`](infra/); nothing external is required.
 
-- **[Azure-Samples/AI-Gateway `labs/finops-framework`](https://github.com/Azure-Samples/AI-Gateway/tree/main/labs/finops-framework)**
-  deploys an APIM AI gateway, an AI Foundry model, per-product (per-team) **token-limit
-  policies**, a **PRICING_CL** table that turns tokens into **dollars**, three workbooks
-  (Cost Analysis, Azure OpenAI Insights, Alerts), and a **Logic App that auto-disables**
-  any APIM subscription that exceeds its cost quota.
+| Component | What it does |
+|---|---|
+| APIM AI gateway + `inference-api` | Fronts Azure AI Foundry; one endpoint, per-team keys |
+| `llm-token-limit` per product | Throttles platinum/gold/silver at different tokens-per-minute and token quotas |
+| `azure-openai-emit-token-metric` | Emits token metrics with a team/product dimension |
+| Foundry + model deployments | gpt-4.1, gpt-4.1-mini, DeepSeek-V3.2 (edit in `params.json`) |
+| `PRICING_CL` + `SUBSCRIPTION_QUOTA_CL` (+ DCRs) | Rate card and per-team budgets |
+| Cost Analysis + Foundry Cost & ROI workbooks | This repo's cost/chargeback and ROI views |
+| Azure OpenAI Insights + Alerts workbooks + dashboard | Operational monitoring |
+| Logic App + scheduled-query rules | **Auto-disables** any team subscription that exceeds its cost quota, and re-enables it when spend drops back under |
 
-**How it relates to this repo:** the lab is strong on **chargeback + budget enforcement per
-product/team**; this repo adds **per-model unit economics + ROI**. Same telemetry backbone,
-so run the lab for the plumbing and enforcement, then layer these tiles on top.
-
-**Deploy it (no notebook or `uv` needed, drive the Bicep directly):**
-
-```powershell
-git clone --depth 1 https://github.com/Azure-Samples/AI-Gateway.git
-cd AI-Gateway/labs/finops-framework
-az account set --subscription "<your-sub>"
-az group create -n lab-finops-framework -l swedencentral
-# params.json mirrors the notebook's default config (models, APIM SKU, products, quotas)
-az deployment group create -n finops-framework -g lab-finops-framework --template-file main.bicep --parameters params.json
-```
-
-Two caveats worth knowing:
-- **Pull latest `main`.** A "cost overstated by 1000x" bug was fixed on 2026-09-16; older
-  clones show the wrong dollars.
-- **Apply your EDP to the rate card.** The lab prices tokens at **list** (from the Azure
-  Retail Prices API). For accurate chargeback under an enterprise discount, scale the
-  input/output prices before uploading them to the PRICING_CL table.
+The infra is adapted from the MIT-licensed Azure-Samples/AI-Gateway project; see
+[`NOTICE`](NOTICE) for attribution. On top of it, this repo adds the improved cost workbook,
+the ROI workbook, weekly rate-card auto-refresh, and the Grafana surface.
 
 ## Notes
 

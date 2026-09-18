@@ -1,0 +1,16 @@
+NOTICE
+======
+
+This project is licensed under the MIT License (see LICENSE).
+
+The infrastructure-as-code under `infra/` (the Bicep template `main.bicep`, the vendored
+Bicep modules under `infra/modules/`, the APIM policies `policy.xml` and
+`products-policy.xml`, the portal dashboard `dashboard.bicep`, and the `Alerts` and
+`Azure OpenAI Insights` workbooks under `infra/workbooks/`) is adapted from the
+Azure-Samples/AI-Gateway project (`labs/finops-framework` and the shared `modules/` tree),
+which is licensed under the MIT License:
+
+    Copyright (c) Microsoft Corporation.
+    https://github.com/Azure-Samples/AI-Gateway
+
+The full MIT License text is included in LICENSE and applies to that adapted code.
