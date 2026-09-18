@@ -26,6 +26,10 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 
 *Breakdown tiles: spend by model, spend by subscription (chargeback), and spend over time.*
 
+![Spend anomaly detection and budget vs actual](docs/dashboard-anomaly-budget.png)
+
+*Spend anomaly detection (actual vs expected) and budget vs actual per subscription, with an OVER BUDGET / Warning / OK status.*
+
 ## What you get
 
 | Panel | Source | Visual |
