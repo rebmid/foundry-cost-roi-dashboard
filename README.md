@@ -157,7 +157,8 @@ cost per 1K), month-to-date spend + forecast + burn-up, spend by model, spend by
 spend over time, **anomaly detection** (actual vs expected), a **live token tile** from platform
 metrics, **budget vs actual** (OVER BUDGET / Warning / OK), a **PRICE MISSING** data-quality tile,
 token split, and a top-consumers table. The **Foundry Cost & ROI** workbook adds the ROI panel
-(hours saved x loaded rate vs token cost). Costs are Azure list price.
+(hours saved x loaded rate vs token cost); see [ROI model](docs/roi-model.md) for what the two
+inputs mean and how to set them. Costs are Azure list price.
 
 Just want one workbook in a setup you already run? Import it via **Monitor > Workbooks > New >
 Advanced Editor** (replace the `{workspace-id}` placeholder with your workspace resource id first),
