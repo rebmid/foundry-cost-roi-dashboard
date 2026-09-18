@@ -69,15 +69,16 @@ Cost Management ──(FOCUS export)──► Storage (real billed $, optional) 
 | File | Reads from | Best for |
 |---|---|---|
 | [`workbook/FoundryCostRoi.workbook`](workbook/FoundryCostRoi.workbook) | App Insights `customMetrics` (APIM `llm-emit-token-metric`) | ROI + unit economics; per-team via a `Team` dimension |
-| [`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced by an editable rate-card parameter | Chargeback + budget vs actual when you deploy the finops-framework lab |
+| [`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced from the `PRICING_CL` rates table | Chargeback + budget vs actual when you deploy the finops-framework lab |
 
 The second one is the drop-in upgrade for the finops-framework lab's thin stock "Cost
-Analysis" workbook: an **editable rate-card parameter** (edit prices in the portal, no
-`PRICING_CL` re-ingestion), a **discount dropdown** (list vs effective cost, default 0% =
-list), a KPI strip (effective + list cost, tokens, calls, cost per 1K), spend by model, spend
-by team, spend over time, **spend anomaly detection** (actual vs expected), budget vs actual
-with an OVER BUDGET / Warning / OK status, token split, and a top-consumers table. Deploy it
-straight into the lab's resource group:
+Analysis" workbook: prices from the **`PRICING_CL` rates table** (refresh it from the Azure
+Retail Prices API instead of hand-editing), a **discount dropdown** (list vs effective cost,
+default 0% = list), a KPI strip (effective + list cost, tokens, calls, cost per 1K), spend by
+model, spend by team, spend over time, **spend anomaly detection** (actual vs expected), a
+**live token tile from platform metrics**, budget vs actual with an OVER BUDGET / Warning / OK
+status, a **PRICE MISSING data-quality tile**, token split, and a top-consumers table. Deploy
+it straight into the lab's resource group:
 
 ```powershell
 az deployment group create -g lab-finops-framework --template-file workbook/deploy-cost-analysis-workbook.bicep --parameters workspaceResourceId=<your Log Analytics workspace resource id>
@@ -91,7 +92,7 @@ Or import it via **Monitor > Workbooks > New > Advanced Editor** (replace the
 - **Rates:** the `rates` datatable maps a model *family* to input/output USD per 1K
   tokens. Deployment names are mapped to a family with a `case()` expression; extend it
   for your deployments. (This is the `FoundryCostRoi.workbook` mechanism; the Log Analytics
-  workbook uses an editable `Rate card` parameter instead, no datatable editing.)
+  workbook reads the `PRICING_CL` rates table instead.)
 - **Billed vs. estimate:** to show invoice-accurate cost, replace the rate-card math in
   the daily-spend and by-model queries with a query over your FOCUS export (cost is
   already in dollars there).
