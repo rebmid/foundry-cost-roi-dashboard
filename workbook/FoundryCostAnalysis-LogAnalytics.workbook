@@ -71,6 +71,13 @@
                       "name":  "parameters"
                   },
                   {
+                      "type":  1,
+                      "content":  {
+                                      "json":  "## Summary for the selected time range: {TimeRange:label}\nThese four tiles follow the **Time range** picker above (default is the last 24 hours), not the calendar month. For month-to-date totals, see the **Month to date** section just below."
+                                  },
+                      "name":  "h-kpi"
+                  },
+                  {
                       "type":  3,
                       "content":  {
                                       "version":  "KqlItem/1.0",
@@ -179,7 +186,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Where the money goes"
+                                      "json":  "## Where the money goes ({TimeRange:label})"
                                   },
                       "name":  "h-breakdown"
                   },
@@ -214,7 +221,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Spend over time by model (fine-grained, follows the Time range picker above)\nHourly bins within the selected **Time range**. Use this to drill into a spike; use the **Month to date** section above for the monthly money view."
+                                      "json":  "## Spend over time by model ({TimeRange:label})\nHourly bins within the selected **Time range**. Use this to drill into a spike; use the **Month to date** section above for the monthly money view."
                                   },
                       "name":  "h-trend"
                   },
@@ -253,7 +260,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Budget vs actual (per team)"
+                                      "json":  "## Budget vs actual (per team, {TimeRange:label})\nSpend in the selected **Time range** vs each team\u0027s quota. Set the picker to **Last 30 days** for a monthly budget view."
                                   },
                       "name":  "h-budget"
                   },
@@ -273,7 +280,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Data quality: deployments with no rate-card entry (PRICE MISSING)\nThese calls are counted but priced at 0 because no PRICING_CL row matches the deployment name. Empty table = every model is priced."
+                                      "json":  "## Data quality: deployments with no rate-card entry (PRICE MISSING) - {TimeRange:label}\nThese calls are counted but priced at 0 because no PRICING_CL row matches the deployment name. Empty table = every model is priced."
                                   },
                       "name":  "h-unmapped"
                   },
@@ -293,7 +300,7 @@
                   {
                       "type":  1,
                       "content":  {
-                                      "json":  "## Token split and top consumers"
+                                      "json":  "## Token split and top consumers ({TimeRange:label})"
                                   },
                       "name":  "h-detail"
                   },
