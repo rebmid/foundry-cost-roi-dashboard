@@ -19,7 +19,7 @@ inputs.
 ```
 Value of time saved      = Hours saved / month  x  Loaded rate ($/hr)
 Agent run cost (MTD)      = token cost for the current month (from PRICING_CL)
-Net ROI (%)              = (Value of time saved - Agent run cost) / Agent run cost  x 100
+Net ROI (%)              = (Value of time saved - Agent run cost) / max(Agent run cost, $1)  x 100
 Payback (share of value) = Agent run cost / Value of time saved
 ```
 
@@ -34,12 +34,15 @@ Payback (share of value) = Agent run cost / Value of time saved
 | Loaded rate ($/hr) | $64 |
 | **Value of time saved** | 1,240 x $64 = **$79,360** |
 | Agent run cost (MTD) | $0.04 |
-| **Net ROI** | ~198,399,900% |
+| **Net ROI** | 7,935,996% |
 | Payback (share of value) | ~0.0000005 |
 
-The eye-watering ROI is only because this is a lab with a few cents of test traffic. With real
-production token spend the numbers become meaningful; the workbook does the comparison automatically
-off live token cost, so the estimate stays current on its own.
+The denominator is floored at **$1** (`max(Agent run cost, $1)`) so a near-zero lab cost does not
+blow the percentage up to infinity; that is why Net ROI reads 7,935,996% rather than ~198,000,000%.
+Once real monthly spend is above $1 the floor stops mattering and it is simply
+(value - cost) / cost. The eye-watering number is only because this is a lab with a few cents of
+test traffic. With real production token spend the numbers become meaningful; the workbook does the
+comparison automatically off live token cost, so the estimate stays current on its own.
 
 ## Setting the inputs
 

@@ -33,6 +33,16 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 
 *Spend anomaly detection (actual vs expected) and budget vs actual per subscription, with an OVER BUDGET / Warning / OK status.*
 
+### Foundry Cost & ROI workbook
+
+![Foundry Cost & ROI workbook overview](docs/roi-overview.png)
+
+*The Log Analytics ROI variant ([`workbook/FoundryCostRoi-LogAnalytics.workbook`](workbook/FoundryCostRoi-LogAnalytics.workbook)): month-to-date cost, run-rate forecast, cost per 1K tokens, and total tokens; a daily spend + anomaly trend; and spend by model. Two pills, **Hours saved / month** and **Loaded rate ($/hr)**, size the ROI.*
+
+![Business value and ROI, and token volume by type](docs/roi-workbook.png)
+
+*Business value / ROI (value of time saved = hours x loaded rate, vs month-to-date token cost) and token volume split into input vs output. See [ROI model](docs/roi-model.md) for what the two inputs mean and the exact math.*
+
 ### Alerts workbook (operational)
 
 ![Azure Monitor Alerts workbook](docs/alerts-workbook.png)
