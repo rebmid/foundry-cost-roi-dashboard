@@ -35,6 +35,27 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 
 *Spend anomaly detection (actual vs expected) and budget vs actual per subscription, with an OVER BUDGET / Warning / OK status.*
 
+### Alerts workbook (operational)
+
+![Azure Monitor Alerts workbook](docs/alerts-workbook.png)
+
+The **Alerts workbook** is a stock operational workbook deployed alongside the cost views (it is
+not a cost tile). It is Azure Monitor's inventory of **alerts that fired** in the subscription over
+the selected window, so you can confirm your **budget-enforcement rules** and **token-spike alerts**
+are actually firing. In this example (last 90 days) there are 365 alerts:
+
+- **By type:** 354 **Log Alerts V2** (the `alert-suspend-sub` / `alert-activate-sub` scheduled-query
+  rules that drive the budget auto-disable, evaluating every 5 minutes and firing when a team crosses
+  or drops back under its cost quota) plus 11 **Platform** metric alerts (for example the token-spike
+  alert).
+- **By state:** all 365 are **New**, because nothing was acknowledged or closed.
+- **Noisiest object:** "Unmapped" (354), because log-query alerts do not attach to a single resource.
+- **Trend:** the burst at the right is when test traffic pushed the deliberately tiny sample quotas
+  over the line, so the suspend/activate rules fired in a flurry.
+
+In production, set realistic quotas and an **action group** so these rules enforce quietly instead of
+generating noise.
+
 ## What you get
 
 | Panel | Source | Visual |
