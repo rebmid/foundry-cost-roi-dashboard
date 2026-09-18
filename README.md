@@ -9,6 +9,19 @@ ValueLens) do not cover.
 > The key idea: **Azure Monitor gives token counts; you add a rate card to get the
 > dollars.** It is one workbook assembled from four data sources, panel by panel.
 
+## What it looks like
+
+![Foundry cost and chargeback workbook](docs/dashboard.png)
+
+*The Log Analytics cost and chargeback workbook ([`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook)), a drop-in upgrade for the finops-framework lab.*
+
+Two pickers scope everything: **Time range** and **Subscription** (the APIM subscription =
+team). The KPI strip shows **total cost, total tokens, calls, and cost per 1K tokens** for the
+selected scope. The **Live token volume** tile reads platform metrics (about 1 minute) for
+near-real-time input / output / total tokens, faster than the log-based tiles. Below (not in
+this view) are spend by model, spend by subscription, spend over time, anomaly detection,
+budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-consumers table.
+
 ## What you get
 
 | Panel | Source | Visual |
