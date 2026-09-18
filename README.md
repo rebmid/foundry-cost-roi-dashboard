@@ -52,14 +52,16 @@ not a cost tile). It is Azure Monitor's inventory of **alerts that fired** in th
 the selected window, so you can confirm your **budget-enforcement rules** and **token-spike alerts**
 are actually firing. In this example (last 90 days) there are 365 alerts:
 
-- **By type:** 354 **Log Alerts V2** (the `alert-suspend-sub` / `alert-activate-sub` scheduled-query
-  rules that drive the budget auto-disable, evaluating every 5 minutes and firing when a team crosses
-  or drops back under its cost quota) plus 11 **Platform** metric alerts (for example the token-spike
-  alert).
+- **By type:** 354 **Log Alerts V2** (the `alert-suspend-subscriptions` / `alert-activate-subscriptions`
+  scheduled-query rules that drive the budget auto-disable, evaluating every 5 minutes and firing when
+  a team crosses or drops back under its cost quota) plus 11 **Platform** metric alerts (for example the
+  token-spike alert).
 - **By state:** all 365 are **New**, because nothing was acknowledged or closed.
 - **Noisiest object:** "Unmapped" (354), because log-query alerts do not attach to a single resource.
 - **Trend:** the burst at the right is when test traffic pushed the deliberately tiny sample quotas
   over the line, so the suspend/activate rules fired in a flurry.
+- **Active Alerts** (bottom table) lists the individual firings, so you can see exactly which rule
+  fired, when, and on which object.
 
 In production, set realistic quotas and an **action group** so these rules enforce quietly instead of
 generating noise.
