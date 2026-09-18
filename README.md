@@ -46,18 +46,21 @@ budget vs actual, a PRICE MISSING data-quality tile, token split, and a top-cons
 | Token volume by type | Prompt / Completion / Cached tokens | stacked column |
 | Business value / ROI | tokens -> cost vs. business inputs (hours saved x loaded rate) | KPI + table |
 
-## Deploy the full platform (standalone)
+## Deploy: two options
 
-The [`infra/`](infra/) folder is a complete, self-contained deployment: an APIM AI gateway
-in front of Azure AI Foundry, per-product (per-team) `llm-token-limit` throttling, the
+Everything is in [`infra/`](infra/). Pick based on whether you already run an APIM gateway.
+
+### Option A: greenfield (creates a new APIM + Foundry)
+
+Use this on a clean subscription with no gateway yet. It deploys **everything**: an APIM AI
+gateway in front of Azure AI Foundry, per-product (per-team) `llm-token-limit` throttling, the
 `azure-openai-emit-token-metric` policy, Foundry model deployments, the `PRICING_CL` +
-`SUBSCRIPTION_QUOTA_CL` tables (with data collection rules), all four workbooks (Cost
-Analysis, Foundry Cost & ROI, Azure OpenAI Insights, Alerts), a portal dashboard, three
-sample products (platinum/gold/silver) with four sample team subscriptions, and a **Logic
-App + scheduled-query rules that auto-disable any team that exceeds its cost quota**.
+`SUBSCRIPTION_QUOTA_CL` tables, all four workbooks + a portal dashboard, three sample products
+(platinum/gold/silver) with four sample team subscriptions, and a **Logic App + scheduled-query
+rules that auto-disable any team that exceeds its cost quota**.
 
 ```powershell
-# 1. Deploy the platform
+# 1. Deploy the platform (creates one APIM in a new resource group)
 ./infra/deploy.ps1 -Subscription <your-sub-id>
 
 # 2. Populate prices/quotas and generate sample traffic
@@ -65,10 +68,61 @@ App + scheduled-query rules that auto-disable any team that exceeds its cost quo
 python infra/postdeploy.py --subscription <your-sub-id> --resource-group finops-standalone --deployment finops-standalone
 ```
 
-Edit [`infra/params.json`](infra/params.json) to change the models, APIM SKU, products, and
-quotas. Costs are Azure **list** price; for an enterprise discount, scale the input/output
-prices before they are written to `PRICING_CL`. Tear down with
-`az group delete -n finops-standalone -y`.
+Edit [`infra/params.json`](infra/params.json) for models, APIM SKU, products, and quotas. Tear
+down with `az group delete -n finops-standalone -y`. Resource names come from
+`uniqueString(subscription, resourceGroup)`, so deploying into an **existing** finops-framework
+resource group reuses that APIM instead of creating a new one.
+
+### Option B: bring your own APIM + workspace (no new APIM)
+
+Use this if you already run an APIM AI gateway and a Log Analytics workspace. It creates only the
+workspace-side pieces: the `PRICING_CL` + `SUBSCRIPTION_QUOTA_CL` tables (with data collection
+rules) and the **Cost Analysis** + **Foundry Cost & ROI** workbooks. It does **not** create an
+APIM. Run it in the resource group that holds your workspace.
+
+```powershell
+./infra/deploy-existing.ps1 -Subscription <your-sub-id> -ResourceGroup <workspace-rg> -WorkspaceName <workspace-name>
+```
+
+Then populate the two tables and confirm your gateway is logging (next section):
+- **Rate card:** deploy [`pricing-refresh/`](pricing-refresh/) against the new `dcr-pricing-*` DCR
+  (weekly auto-refresh from the Azure Retail Prices API), or seed `PRICING_CL` once.
+- **Budgets:** write one `SUBSCRIPTION_QUOTA_CL` row per team (APIM subscription) with its `CostQuota`.
+
+## Requirements: what must exist and be turned on
+
+For the dashboards to show data, this chain has to be in place. **Option A sets all of it up for
+you.** For **Option B** you point at what you already have and turn on the gateway logging
+(requirements 2 and 3 are the ones people forget).
+
+| # | Requirement | Feeds | How |
+|---|---|---|---|
+| 1 | An **APIM AI gateway** in front of Azure OpenAI / Foundry, with per-team **subscriptions** | team attribution | your gateway (Option A creates one) |
+| 2 | APIM **resource diagnostic** to Log Analytics: `AllLogs` + resource-specific (Dedicated) tables | `ApiManagementGatewayLogs` | APIM > Diagnostic settings; or CLI below |
+| 3 | An **`azureMonitor` logger** on APIM + the LLM API's **per-API diagnostic** with `largeLanguageModel.logs = enabled` | `ApiManagementGatewayLlmLog` (token counts) | API > Settings > Diagnostics logs (Azure Monitor), turn on **LLM logs** |
+| 4 | **`PRICING_CL`** table populated (rate card) | dollars | Option A postdeploy, or [`pricing-refresh/`](pricing-refresh/) auto-refresh |
+| 5 | **`SUBSCRIPTION_QUOTA_CL`** table populated | budget vs actual tile | one row per team with `CostQuota` |
+| 6 | *(optional)* Foundry/AOAI **resource diagnostic** to the workspace (`AllMetrics`) | the **Live token volume** tile (`AzureMetrics`) | Foundry resource > Diagnostic settings |
+| 7 | *(optional)* APIM **`azure-openai-emit-token-metric`** policy + an App Insights diagnostic | the App-Insights ROI variant (`customMetrics` / `AppMetrics`) | see [`enablement/`](enablement/) |
+| 8 | **Reader** on the workspace to view; **Monitoring Metrics Publisher** on the DCRs to ingest prices/quotas | - | RBAC |
+
+Turn on gateway logging for an existing APIM (requirements 2 and 3):
+
+```powershell
+# 2. Route APIM logs to your workspace as resource-specific (dedicated) tables
+az monitor diagnostic-settings create --name finops-dashboards `
+  --resource <apim-resource-id> `
+  --workspace <workspace-resource-id> `
+  --logs '[{"categoryGroup":"allLogs","enabled":true}]' `
+  --metrics '[{"category":"AllMetrics","enabled":true}]' `
+  --export-to-resource-specific true
+
+# 3. Turn on LLM logging (portal is easiest):
+#    APIM > APIs > <your Azure OpenAI API> > Settings > Diagnostics logs > Azure Monitor >
+#    enable, select an azureMonitor logger, and turn ON the Large language model (LLM) logs.
+```
+
+Without requirements 2 and 3, `ApiManagementGatewayLlmLog` is empty and every cost tile reads zero.
 
 ## Architecture (four sources into one workbook)
 
