@@ -14,9 +14,12 @@ param(
     [string] $StreamName  = 'Custom-Json-PRICING_CL',
     [string] $Region      = 'swedencentral',
     [string] $ServiceName = 'Foundry Models',
-    [Parameter(Mandatory)][string] $MeterMapJson      # {"gpt-4.1":["gpt 4.1 Inp glbl","gpt 4.1 Outp glbl"], ...}
+    [Parameter(Mandatory)][string] $MeterMapB64      # base64 of {"gpt-4.1":["gpt 4.1 Inp glbl","gpt 4.1 Outp glbl"], ...}
 )
 $ErrorActionPreference = 'Stop'
+
+# Azure Automation auto-deserializes JSON-looking string params, so the map is passed base64-encoded.
+$MeterMapJson = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($MeterMapB64))
 
 # 1) managed-identity token for the Monitor ingestion endpoint (handle SecureString on newer Az.Accounts)
 Connect-AzAccount -Identity | Out-Null

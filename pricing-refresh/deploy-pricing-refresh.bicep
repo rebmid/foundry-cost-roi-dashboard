@@ -65,7 +65,7 @@ resource jobSchedule 'Microsoft.Automation/automationAccounts/jobSchedules@2023-
       StreamName: streamName
       Region: region
       ServiceName: serviceName
-      MeterMapJson: meterMapJson
+      MeterMapB64: base64(meterMapJson)
     }
   }
   dependsOn: [
