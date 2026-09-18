@@ -21,9 +21,11 @@ your billing system, not instead of it.
 - **What it covers:** Foundry / Azure OpenAI traffic **routed through the APIM gateway**. Team
   attribution comes from the APIM subscription, so it only sees traffic that carries an APIM key.
 - **What it does not cover:** Foundry or Azure OpenAI traffic that **bypasses APIM**, Azure OpenAI
-  resources without the token-logging policy, and Copilot products billed separately (**Microsoft
-  365 Copilot, GitHub Copilot, Copilot Studio**). Route those through the gateway, or track them in
-  Cost Management / your FinOps platform.
+  resources without the token-logging policy, and the per-seat Copilot products (**Microsoft 365
+  Copilot, GitHub Copilot, Copilot Studio**). You still see their **dollar cost** in billing (Azure
+  Cost Management for Azure-billed services; the Microsoft 365 admin center or GitHub billing for the
+  Copilot seats), just not the token / team / model breakdown this dashboard adds. To get that
+  breakdown, route the traffic through the APIM gateway.
 - **Estimate, not invoice.** Cost here is tokens x rate card at Azure **list** price. For billed and
   amortized truth, use Cost Management / a **FOCUS** export and reconcile the two with
   [`queries/07-focus-reconciliation.kql`](queries/07-focus-reconciliation.kql): it derives a per-day
@@ -31,10 +33,15 @@ your billing system, not instead of it.
   invoice (billed data lags ~24h, so this is next-day calibration).
 
 The strongest architecture is three layers: **this dashboard** (live tokens, estimated cost,
-chargeback, anomalies, quotas, ROI) + **Cost Management / FOCUS** (billed and amortized truth) + a
+chargeback, anomalies, quotas, ROI) + [**Cost Management**](https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/costanalysis) / FOCUS (billed and amortized truth) + a
 **reconciliation view** between them.
 
 ## What it looks like
+
+The views below are this repo's Azure Monitor workbooks, the **Cost Analysis** and **Foundry Cost &
+ROI** workbooks (the Log Analytics ones deployed by [`infra/`](infra/)), plus the stock **Alerts**
+workbook. They are the live-token and estimated-cost layer; billed dollars live in
+[Cost Management](https://portal.azure.com/#view/Microsoft_Azure_CostManagement/Menu/~/costanalysis).
 
 ![Foundry cost and chargeback workbook](docs/dashboard.png)
 
