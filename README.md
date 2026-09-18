@@ -87,6 +87,22 @@ az deployment group create -g lab-finops-framework --template-file workbook/depl
 Or import it via **Monitor > Workbooks > New > Advanced Editor** (replace the
 `{workspace-id}` placeholder with your workspace resource id first).
 
+## Keep the rate card current (auto-refresh)
+
+`PRICING_CL` holds Azure list prices. To keep it current with **zero editing**, deploy the
+included Automation runbook that re-pulls the **Azure Retail Prices API** on a weekly schedule
+and writes to the same data collection rule the lab created:
+
+- [`pricing-refresh/Refresh-PricingCL.ps1`](pricing-refresh/Refresh-PricingCL.ps1): the runbook (managed-identity auth, no keys).
+- [`pricing-refresh/deploy-pricing-refresh.bicep`](pricing-refresh/deploy-pricing-refresh.bicep): Automation account + system-assigned identity + weekly schedule + the `Monitoring Metrics Publisher` grant on the DCR.
+
+```powershell
+az deployment group create -g <rg> --template-file pricing-refresh/deploy-pricing-refresh.bicep --parameters runbookRawUrl=<raw-url> dcrName=<dcr-name> dcrEndpoint=<dcr-endpoint> dcrImmutableId=<dcr-immutable-id> meterMapJson=<model-to-meter-json>
+```
+
+The only thing to maintain is the **model-to-meter map** (the Retail Prices API meter names do
+not equal deployment names); the workbook's PRICE MISSING tile flags anything unmapped.
+
 ## Customize
 
 - **Rates:** the `rates` datatable maps a model *family* to input/output USD per 1K
