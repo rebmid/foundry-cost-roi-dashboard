@@ -72,13 +72,13 @@ Cost Management ──(FOCUS export)──► Storage (real billed $, optional) 
 | [`workbook/FoundryCostAnalysis-LogAnalytics.workbook`](workbook/FoundryCostAnalysis-LogAnalytics.workbook) | Log Analytics `ApiManagementGatewayLlmLog` priced from the `PRICING_CL` rates table | Chargeback + budget vs actual when you deploy the finops-framework lab |
 
 The second one is the drop-in upgrade for the finops-framework lab's thin stock "Cost
-Analysis" workbook: prices from the **`PRICING_CL` rates table** (refresh it from the Azure
-Retail Prices API instead of hand-editing), a **discount dropdown** (list vs effective cost,
-default 0% = list), a KPI strip (effective + list cost, tokens, calls, cost per 1K), spend by
-model, spend by team, spend over time, **spend anomaly detection** (actual vs expected), a
-**live token tile from platform metrics**, budget vs actual with an OVER BUDGET / Warning / OK
-status, a **PRICE MISSING data-quality tile**, token split, and a top-consumers table. Deploy
-it straight into the lab's resource group:
+Analysis" workbook, and it works for **any** finops-framework deployment: prices from the
+**`PRICING_CL` rates table** (refresh it from the Azure Retail Prices API instead of
+hand-editing), a KPI strip (cost, tokens, calls, cost per 1K), spend by model, spend by
+team, spend over time, **spend anomaly detection** (actual vs expected), a **live token tile
+from platform metrics**, budget vs actual with an OVER BUDGET / Warning / OK status, a
+**PRICE MISSING data-quality tile**, token split, and a top-consumers table. Costs are Azure
+list price. Deploy it straight into the resource group:
 
 ```powershell
 az deployment group create -g lab-finops-framework --template-file workbook/deploy-cost-analysis-workbook.bicep --parameters workspaceResourceId=<your Log Analytics workspace resource id>
