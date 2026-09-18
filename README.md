@@ -20,12 +20,15 @@ your billing system, not instead of it.
 
 - **What it covers:** Foundry / Azure OpenAI traffic **routed through the APIM gateway**. Team
   attribution comes from the APIM subscription, so it only sees traffic that carries an APIM key.
-- **What it does not cover:** Foundry or Azure OpenAI traffic that **bypasses APIM**, Azure OpenAI
-  resources without the token-logging policy, and the per-seat Copilot products (**Microsoft 365
-  Copilot, GitHub Copilot, Copilot Studio**). You still see their **dollar cost** in billing (Azure
-  Cost Management for Azure-billed services; the Microsoft 365 admin center or GitHub billing for the
-  Copilot seats), just not the token / team / model breakdown this dashboard adds. To get that
-  breakdown, route the traffic through the APIM gateway.
+- **What it does not cover:** two separate things. First, your own Foundry / Azure OpenAI traffic
+  that **bypasses APIM** or runs on a resource **without the token-logging policy**; route it through
+  the gateway (or add the policy) and it shows up here. Second, the **Copilot products** (Microsoft
+  365 Copilot, GitHub Copilot, Copilot Studio), which are Microsoft-run SaaS: their model calls
+  **never traverse your APIM**, so this dashboard cannot break them down by token / team / model no
+  matter what. Microsoft 365 Copilot and GitHub Copilot are licensed **per seat**; Copilot Studio is
+  **consumption-based** (message packs or pay-as-you-go messages). You see their **dollar cost** only
+  in their own billing surfaces: the Microsoft 365 admin center, GitHub billing, or Azure Cost
+  Management, depending on how each is licensed.
 - **Estimate, not invoice.** Cost here is tokens x rate card at Azure **list** price. For billed and
   amortized truth, use Cost Management / a **FOCUS** export and reconcile the two with
   [`queries/07-focus-reconciliation.kql`](queries/07-focus-reconciliation.kql): it derives a per-day
