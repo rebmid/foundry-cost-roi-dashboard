@@ -46,7 +46,7 @@
                                                              "id":  "sub",
                                                              "version":  "KqlParameterItem/1.0",
                                                              "name":  "Subscription",
-                                                             "label":  "Subscription (team)",
+                                                             "label":  "Subscription",
                                                              "type":  2,
                                                              "isRequired":  true,
                                                              "multiSelect":  true,
